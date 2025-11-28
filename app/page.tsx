@@ -1,0 +1,239 @@
+"use client";
+
+import { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
+import { articles, categories } from "@/lib/data";
+import { SearchBar } from "@/components/SearchBar";
+import { CategoryFilter } from "@/components/CategoryFilter";
+import { ArticleCard } from "@/components/ArticleCard";
+import { FileText, Brain, Upload, MessageSquare, Sparkles } from "lucide-react";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocumentAPI, SearchAPI, Document as APIDocument } from "@/lib/api";
+import { Article } from "@/lib/types";
+
+export default function Home() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [useBackendSearch, setUseBackendSearch] = useState(false);
+
+  const categoryNames = useMemo(() => categories.map(c => c.name), []);
+
+  // Load documents from backend on mount
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const response = await DocumentAPI.getDocuments(0, 100);
+        // If we have backend documents, enable backend search
+        if (response.items.length > 0) {
+          setUseBackendSearch(true);
+        }
+      } catch (err) {
+        console.log('Backend not available, using mock data');
+        setUseBackendSearch(false);
+      }
+    };
+    loadDocuments();
+  }, []);
+
+  // Convert backend documents to Article format for display
+  const convertDocToArticle = (doc: APIDocument): Article => ({
+    id: doc.id.toString(),
+    title: doc.title,
+    content: doc.content,
+    summary: doc.content.substring(0, 150) + '...',
+    category: doc.metadata?.category || 'Engineering',
+    tags: doc.metadata?.tags || [],
+    author: `User ${doc.user_id}`,
+    createdAt: new Date(doc.created_at),
+    updatedAt: new Date(doc.updated_at),
+    views: 0,
+  });
+
+  // Backend search using semantic search
+  const [backendSearchResults, setBackendSearchResults] = useState<Article[]>([]);
+
+  useEffect(() => {
+    const performBackendSearch = async () => {
+      if (!useBackendSearch || !searchQuery.trim()) {
+        setBackendSearchResults([]);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const response = await SearchAPI.search({
+          query: searchQuery,
+          use_rag: false, // Just search, don't generate RAG response
+          top_k: 20,
+        });
+
+        // Convert search results to articles with null checks
+        const articles = (response.results || [])
+          .filter(result => result && result.document)
+          .map(result => {
+            const doc = result.document;
+            return convertDocToArticle({
+              ...doc,
+              id: doc.id,
+              title: doc.title,
+              content: result.chunk_content || doc.content,
+              user_id: doc.user_id,
+              created_at: doc.created_at,
+              updated_at: doc.updated_at,
+            } as APIDocument);
+          });
+
+        setBackendSearchResults(articles);
+      } catch (err) {
+        console.error('Backend search failed:', err);
+        setBackendSearchResults([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    // Debounce search
+    const timer = setTimeout(performBackendSearch, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, useBackendSearch]);
+
+  // Mock data filtering (fallback)
+  const filteredMockArticles = useMemo(() => {
+    return articles.filter((article) => {
+      const matchesSearch = searchQuery === "" ||
+        article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        article.summary.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        article.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        article.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      const matchesCategory = selectedCategory === null || article.category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [searchQuery, selectedCategory]);
+
+  // Use backend results if available, otherwise use mock data
+  const filteredArticles = useBackendSearch && searchQuery.trim()
+    ? backendSearchResults
+    : filteredMockArticles;
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      {/* Hero Section */}
+      <div className="mb-12 text-center animate-slide-in-from-top">
+        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 animate-fade-in">
+          <Sparkles className="h-4 w-4 animate-pulse" />
+          AI-Powered Knowledge Management
+        </div>
+        <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-primary via-purple-600 to-red-600 bg-clip-text text-transparent animate-slide-in-from-bottom">
+          Access Group Knowledge Hub
+        </h1>
+        <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-slide-in-from-bottom [animation-delay:100ms]">
+          Upload documents, ask questions, and get AI-powered answers with source citations
+        </p>
+      </div>
+
+      {/* Feature Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <Link href="/knowledge" className="group">
+          <Card className="h-full hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer border-primary/20 hover:border-primary/50 animate-slide-in-from-left">
+            <CardHeader>
+              <Brain className="h-10 w-10 text-primary mb-2 group-hover:scale-110 transition-transform" />
+              <CardTitle className="group-hover:text-primary transition-colors">AI Assistant</CardTitle>
+              <CardDescription>
+                Ask questions and get intelligent answers from your documents with citations
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/knowledge" className="group">
+          <Card className="h-full hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer border-primary/20 hover:border-primary/50 animate-slide-in-from-bottom [animation-delay:100ms]">
+            <CardHeader>
+              <Upload className="h-10 w-10 text-primary mb-2 group-hover:scale-110 transition-transform" />
+              <CardTitle className="group-hover:text-primary transition-colors">Document Upload</CardTitle>
+              <CardDescription>
+                Upload company documents to build your searchable knowledge base
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+
+        <Link href="/knowledge" className="group">
+          <Card className="h-full hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer border-primary/20 hover:border-primary/50 animate-slide-in-from-right [animation-delay:200ms]">
+            <CardHeader>
+              <MessageSquare className="h-10 w-10 text-primary mb-2 group-hover:scale-110 transition-transform" />
+              <CardTitle className="group-hover:text-primary transition-colors">Source Citations</CardTitle>
+              <CardDescription>
+                Every answer includes references to source documents and page numbers
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      </div>
+
+      {/* Articles Section */}
+      <div className="mb-8">
+        <h2 className="text-3xl font-bold mb-2">Browse Articles</h2>
+        <p className="text-muted-foreground">
+          Search and explore our internal documentation and resources
+        </p>
+      </div>
+
+      <div className="space-y-6 mb-8">
+        <SearchBar
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search by title, content, or tags..."
+        />
+
+        <div>
+          <h2 className="text-sm font-medium mb-3">Filter by Category</h2>
+          <CategoryFilter
+            categories={categoryNames}
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+          />
+        </div>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {isLoading ? "Searching..." : `${filteredArticles.length} ${filteredArticles.length === 1 ? "article" : "articles"} found`}
+          {useBackendSearch && searchQuery.trim() && !isLoading && (
+            <span className="ml-2 text-primary">(AI-powered search)</span>
+          )}
+        </p>
+      </div>
+
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-64 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      ) : filteredArticles.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredArticles.map((article, index) => (
+            <div
+              key={article.id}
+              className="animate-fade-in"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <ArticleCard article={article} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 animate-fade-in">
+          <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4 animate-zoom-in" />
+          <h3 className="text-lg font-semibold mb-2">No articles found</h3>
+          <p className="text-muted-foreground">
+            Try adjusting your search or filters
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
