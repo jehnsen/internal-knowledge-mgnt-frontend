@@ -28,10 +28,12 @@ export default function LoginPage() {
 
     try {
       await login(formData.username, formData.password);
-      router.push("/knowledge");
+      // Small delay to ensure auth state updates
+      setTimeout(() => {
+        router.replace("/dashboard");
+      }, 100);
     } catch (err: any) {
       setError(err.message || "Failed to login. Please check your credentials.");
-    } finally {
       setIsLoading(false);
     }
   };

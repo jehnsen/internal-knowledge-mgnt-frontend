@@ -42,10 +42,12 @@ export default function RegisterPage() {
 
     try {
       await register(formData.username, formData.email, formData.password, formData.fullName);
-      router.push("/knowledge");
+      // Small delay to ensure auth state updates
+      setTimeout(() => {
+        router.replace("/dashboard");
+      }, 100);
     } catch (err: any) {
       setError(err.message || "Failed to create account. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };

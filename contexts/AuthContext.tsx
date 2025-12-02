@@ -26,7 +26,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const currentUser = await AuthAPI.getCurrentUser();
           setUser(currentUser);
         } catch (error) {
-          console.error("Failed to load user:", error);
+          // Silently handle authentication errors (token expired, etc.)
+          // Just clear the invalid token
           AuthAPI.logout();
         }
       }

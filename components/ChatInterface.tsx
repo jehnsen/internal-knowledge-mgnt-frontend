@@ -82,10 +82,20 @@ export function ChatInterface({ conversationId, onQuery }: ChatInterfaceProps) {
           };
         });
 
+      // Check if backend returned an AI-generated answer
+      let assistantContent = response.rag_response;
+
+      // If no RAG response, create a helpful answer from the search results
+      if (!assistantContent && citations.length > 0) {
+        assistantContent = `I found ${citations.length} relevant document${citations.length > 1 ? 's' : ''} that might help answer your question. The most relevant match is "${citations[0].documentName}" with a ${Math.round(citations[0].relevanceScore * 100)}% confidence score.\n\nPlease check the sources below for detailed information.`;
+      } else if (!assistantContent) {
+        assistantContent = 'I couldn\'t find any relevant documents in the knowledge base for this question. Please try rephrasing your query or upload relevant documents.';
+      }
+
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: response.rag_response || 'Based on the search results, here are the most relevant documents from your knowledge base.',
+        content: assistantContent,
         citations,
         timestamp: new Date(),
       };

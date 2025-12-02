@@ -10,6 +10,7 @@ export interface User {
   email: string;
   full_name: string;
   is_active: boolean;
+  role?: 'admin' | 'user';  // Add role field
   created_at: string;
 }
 
@@ -35,6 +36,8 @@ export interface Document {
   id: number;
   title: string;
   content: string;
+  category?: string;
+  tags?: string[];
   file_path?: string;
   file_type?: string;
   file_size?: number;
@@ -67,7 +70,16 @@ export interface SearchRequest {
 }
 
 export interface SearchResult {
-  document: Document;
+  document?: Document;  // Optional for backward compatibility
+  doc_metadata?: any;   // Alternative format from backend
+  // Fields that may come directly on the result
+  id?: number;
+  title?: string;
+  content?: string;
+  category?: string;
+  tags?: string[];
+  created_at?: string;
+  updated_at?: string;
   similarity_score: number;
   chunk_content?: string;
 }
@@ -121,10 +133,27 @@ function getAuthHeaders(): HeadersInit {
 // Helper function to handle API errors
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
-    throw new Error(error.detail || `API Error: ${response.status}`);
+    let errorDetail = 'An error occurred';
+    try {
+      const error = await response.json();
+      errorDetail = error.detail || error.message || errorDetail;
+    } catch {
+      // If JSON parsing fails, try to get text
+      try {
+        const text = await response.text();
+        if (text) errorDetail = text.substring(0, 200); // Limit error message length
+      } catch {
+        errorDetail = `API Error: ${response.status} ${response.statusText}`;
+      }
+    }
+    throw new Error(errorDetail);
   }
-  return response.json();
+
+  try {
+    return await response.json();
+  } catch (error) {
+    throw new Error('Invalid response format from server');
+  }
 }
 
 export class AuthAPI {
@@ -195,16 +224,16 @@ export class DocumentAPI {
     return handleResponse<Document>(response);
   }
 
-  static async uploadDocumentFile(file: File, title?: string, metadata?: Record<string, any>): Promise<Document> {
+  static async uploadDocumentFile(file: File, category?: string, tags?: string[]): Promise<Document> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file, file.name);  // Include filename explicitly
 
-    if (title) {
-      formData.append('title', title);
+    if (category) {
+      formData.append('category', category);
     }
 
-    if (metadata) {
-      formData.append('metadata', JSON.stringify(metadata));
+    if (tags && tags.length > 0) {
+      formData.append('tags', tags.join(', '));  // Space after comma like Postman
     }
 
     const token = getAuthToken();
@@ -213,7 +242,10 @@ export class DocumentAPI {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}${API_VERSION}/documents/`, {
+    // Log the upload attempt
+    console.log('Uploading file:', file.name, 'category:', category, 'tags:', tags);
+
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/upload/document`, {
       method: 'POST',
       headers,
       body: formData,
@@ -314,8 +346,8 @@ export class SearchAPI {
 
 // Legacy compatibility - keeping old interface names
 export class KnowledgeAPI {
-  static async uploadDocument(file: File, description?: string): Promise<Document> {
-    return DocumentAPI.uploadDocumentFile(file, file.name, { description });
+  static async uploadDocument(file: File, category?: string, tags?: string[]): Promise<Document> {
+    return DocumentAPI.uploadDocumentFile(file, category, tags);
   }
 
   static async getDocuments(): Promise<Document[]> {

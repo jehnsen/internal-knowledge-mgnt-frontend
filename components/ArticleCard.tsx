@@ -16,28 +16,38 @@ export function ArticleCard({ article }: ArticleCardProps) {
   });
 
   return (
-    <Link href={`/articles/${article.id}`}>
-      <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer">
+    <Link href={`/articles/${article.id}`} className="group">
+      <Card className="h-full hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer border-border hover:border-primary/50 overflow-hidden">
         <CardHeader>
           <div className="flex items-start justify-between gap-2 mb-2">
-            <Badge variant="secondary">{article.category}</Badge>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Badge variant="secondary" className="group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              {article.category}
+            </Badge>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-primary transition-colors">
               <Eye className="h-3 w-3" />
               <span>{article.views}</span>
             </div>
           </div>
-          <CardTitle className="line-clamp-2">{article.title}</CardTitle>
-          <CardDescription className="line-clamp-2">{article.summary}</CardDescription>
+          <CardTitle className="line-clamp-2 group-hover:text-primary transition-colors">
+            {article.title}
+          </CardTitle>
+          <CardDescription className="line-clamp-2">
+            {article.summary}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-1.5 mb-3">
             {article.tags.slice(0, 3).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
+              <Badge
+                key={tag}
+                variant="outline"
+                className="text-xs group-hover:border-primary/50 transition-colors"
+              >
                 {tag}
               </Badge>
             ))}
             {article.tags.length > 3 && (
-              <Badge variant="outline" className="text-xs">
+              <Badge variant="outline" className="text-xs group-hover:border-primary/50 transition-colors">
                 +{article.tags.length - 3}
               </Badge>
             )}

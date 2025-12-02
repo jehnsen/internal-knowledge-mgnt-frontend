@@ -8,6 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Citation } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+// Helper to clean and format text
+function formatText(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+    .replace(/\n+/g, ' ')   // Replace newlines with spaces
+    .trim();
+}
+
 interface CitationCardProps {
   citation: Citation;
   index: number;
@@ -75,13 +83,14 @@ export function CitationCard({ citation, index }: CitationCardProps) {
 
             <div className={cn(
               "overflow-hidden transition-all",
-              isExpanded ? "max-h-96" : "max-h-12"
+              isExpanded ? "max-h-96 overflow-y-auto" : "max-h-12"
             )}>
               <p className={cn(
-                "text-xs text-muted-foreground",
-                !isExpanded && "line-clamp-2"
+                "text-sm leading-relaxed",
+                !isExpanded && "line-clamp-2 text-muted-foreground",
+                isExpanded && "text-foreground/90 bg-muted/30 p-3 rounded-lg"
               )}>
-                {citation.content}
+                {formatText(citation.content)}
               </p>
             </div>
 
