@@ -64,31 +64,59 @@ export interface DocumentUpdate {
 
 export interface SearchRequest {
   query: string;
-  top_k?: number;
-  use_rag?: boolean;
-  filters?: Record<string, any>;
-}
-
-export interface SearchResult {
-  document?: Document;  // Optional for backward compatibility
-  doc_metadata?: any;   // Alternative format from backend
-  // Fields that may come directly on the result
-  id?: number;
-  title?: string;
-  content?: string;
+  limit?: number;
   category?: string;
   tags?: string[];
-  created_at?: string;
-  updated_at?: string;
-  similarity_score: number;
-  chunk_content?: string;
+  alpha?: number;
+  use_chunks?: boolean;
+  generate_answer?: boolean;
+}
+
+// Source document from hybrid search
+export interface SourceDocument {
+  document_id: number;
+  title: string;
+  category: string | null;
+  filename: string;
+  file_type: string;
+  chunk_index: number | null;
+  relevance_score: number;
+  score_breakdown: {
+    keyword_score: number;
+    semantic_score: number;
+    combined_score: number;
+  } | null;
+}
+
+// Full document result from hybrid search
+export interface SearchResult {
+  document_id: number;
+  title: string;
+  content: string;
+  summary: string;
+  category: string | null;
+  tags: string[];
+  filename: string;
+  file_type: string;
+  created_at: string;
+  relevance_score: number;
+  score_breakdown: {
+    keyword_score: number;
+    semantic_score: number;
+    combined_score: number;
+  };
 }
 
 export interface SearchResponse {
-  results: SearchResult[];
-  rag_response?: string;
   query: string;
+  answer: string;  // RAG-generated answer
+  source_documents: SourceDocument[];  // Prioritized sources
+  results: SearchResult[];  // Full document results
   total_results: number;
+  execution_time: number;
+  search_method: string;
+  alpha: number;
+  rag_enabled: boolean;
 }
 
 export interface Citation {
@@ -106,6 +134,61 @@ export interface PaginatedResponse<T> {
   page: number;
   size: number;
   pages: number;
+}
+
+// Chat Session Types
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  sources?: SourceDocument[];
+}
+
+export interface ChatSession {
+  session_id: string;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  title?: string;
+}
+
+export interface ChatRequest {
+  message: string;
+  session_id?: string;
+  use_knowledge_base?: boolean;
+  max_history?: number;
+  search_limit?: number;
+}
+
+export interface ChatResponse {
+  session_id: string;
+  response: string;
+  sources: SourceDocument[];
+  timestamp: string;
+}
+
+// Analytics Types
+export interface AnalyticsOverview {
+  total_documents: number;
+  total_searches: number;
+  total_chat_sessions: number;
+  active_users: number;
+  popular_queries: Array<{ query: string; count: number }>;
+  top_documents: Array<{ document_id: number; title: string; access_count: number }>;
+}
+
+export interface SearchTrend {
+  date: string;
+  query: string;
+  count: number;
+}
+
+export interface TopDocument {
+  document_id: number;
+  title: string;
+  access_count: number;
+  last_accessed: string;
 }
 
 // Helper function to get auth token
@@ -133,6 +216,35 @@ function getAuthHeaders(): HeadersInit {
 // Helper function to handle API errors
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
+    // Handle authentication/authorization errors
+    if (response.status === 401 || response.status === 403) {
+      // Clear invalid token
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+
+        // Show elegant toast notification
+        const isExpired = response.status === 401;
+        const message = isExpired
+          ? 'Your session has expired. Please log in again.'
+          : 'Authentication failed. Please log in again.';
+
+        // Dynamically import and show toast
+        import('sonner').then(({ toast }) => {
+          toast.error(message, {
+            description: 'Redirecting to login page...',
+            duration: 3000,
+          });
+        });
+
+        // Redirect to login after brief delay
+        setTimeout(() => {
+          window.location.href = '/login?sessionExpired=true';
+        }, 1500);
+
+        throw new Error(message);
+      }
+    }
+
     let errorDetail = 'An error occurred';
     try {
       const error = await response.json();
@@ -163,6 +275,7 @@ export class AuthAPI {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(data),
     });
 
@@ -176,6 +289,7 @@ export class AuthAPI {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({
         username: data.username,
         password: data.password,
@@ -196,6 +310,7 @@ export class AuthAPI {
   static async getCurrentUser(): Promise<User> {
     const response = await fetch(`${API_BASE_URL}${API_VERSION}/auth/me`, {
       headers: getAuthHeaders(),
+      credentials: 'include',
     });
 
     return handleResponse<User>(response);
@@ -315,7 +430,7 @@ export class DocumentAPI {
 
 export class SearchAPI {
   static async search(request: SearchRequest): Promise<SearchResponse> {
-    const response = await fetch(`${API_BASE_URL}${API_VERSION}/search/`, {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/hybrid-search`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(request),
@@ -359,11 +474,148 @@ export class KnowledgeAPI {
     return DocumentAPI.deleteDocument(Number(documentId));
   }
 
-  static async query(request: { query: string; use_rag?: boolean }): Promise<SearchResponse> {
+  static async query(request: { query: string; generate_answer?: boolean }): Promise<SearchResponse> {
     return SearchAPI.search({
       query: request.query,
-      use_rag: request.use_rag ?? true,
-      top_k: 5,
+      generate_answer: request.generate_answer ?? true,
+      limit: 10,
     });
+  }
+}
+
+// Chat API
+export class ChatAPI {
+  static async sendMessage(request: ChatRequest): Promise<ChatResponse> {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/chat/`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(request),
+    });
+
+    return handleResponse<ChatResponse>(response);
+  }
+
+  static async getSessions(limit: number = 50, offset: number = 0): Promise<ChatSession[]> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/chat/sessions?${params}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<ChatSession[]>(response);
+  }
+
+  static async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/chat/sessions/${sessionId}/messages`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<ChatMessage[]>(response);
+  }
+
+  static async deleteSession(sessionId: string): Promise<void> {
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/chat/sessions/${sessionId}`,
+      {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Failed to delete session' }));
+      throw new Error(error.detail);
+    }
+  }
+}
+
+// Analytics API
+export class AnalyticsAPI {
+  static async getOverview(): Promise<AnalyticsOverview> {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/analytics/overview`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    return handleResponse<AnalyticsOverview>(response);
+  }
+
+  static async getTopDocuments(limit: number = 10): Promise<TopDocument[]> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/analytics/top-documents?${params}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<TopDocument[]>(response);
+  }
+
+  static async getSearchTrends(days: number = 30): Promise<SearchTrend[]> {
+    const params = new URLSearchParams({
+      days: days.toString(),
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/analytics/search-trends?${params}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<SearchTrend[]>(response);
+  }
+}
+
+// Download API
+export class DownloadAPI {
+  static getDocumentDownloadUrl(documentId: number): string {
+    const token = getAuthToken();
+    return `${API_BASE_URL}${API_VERSION}/documents/${documentId}/download?token=${token}`;
+  }
+
+  static async downloadDocument(documentId: number, filename?: string): Promise<void> {
+    const token = getAuthToken();
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/documents/${documentId}/download`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Failed to download document');
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename || `document_${documentId}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
   }
 }

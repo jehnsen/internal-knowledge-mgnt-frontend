@@ -333,3 +333,158 @@ The knowledge page displays:
 - Bottom navigation on mobile
 
 
+TODO:
+==================================================================
+High-Priority Enhancements
+<!-- 1. Conversational Chat Experience (Already in TODO)
+Current State: Single Q&A format
+Enhancement: Multi-turn conversational AI with context awareness
+Maintain conversation history with context
+Allow follow-up questions that reference previous answers
+Add "Ask a follow-up" button to previous responses
+Show conversation threads with timestamps
+Save and resume conversations -->
+2. Advanced Search & Filtering
+Current State: Basic semantic search
+Enhancement: Multi-faceted search capabilities
+Filter by document type (PDF, Word, Excel, etc.)
+Filter by upload date range
+Filter by uploader/author
+Sort results by relevance, date, or file type
+Search within specific documents only
+Combine semantic + keyword search modes
+3. Document Preview & Viewer
+Enhancement: In-app document viewing
+PDF viewer with page navigation
+Word/Excel document renderer
+Highlight matched sections in preview
+Thumbnail previews in document library
+Quick preview on hover
+Download original file option
+<!-- 4. User Analytics & Insights
+Enhancement: Track usage and improve knowledge base
+Most searched queries dashboard
+Document access analytics (which docs are most relevant)
+Unanswered questions tracking
+User engagement metrics
+Popular topics/categories
+Search query suggestions based on trends -->
+5. Collaborative Features
+Enhancement: Team collaboration tools
+Document comments and annotations
+Share specific answers via link
+Favorite/bookmark documents
+Document version history
+Collaborative editing for articles
+@mention team members in comments
+🚀 Medium-Priority Features
+6. Smart Document Organization
+Auto-categorization using AI
+Tag suggestions based on content
+Folder/collection system
+Related documents suggestions
+Duplicate document detection
+Bulk upload and batch processing
+7. Enhanced RBAC & Permissions
+Current State: Basic guest/employee/admin roles
+Enhancement: Granular permission system
+Department-based access control
+Document-level permissions
+Share documents with specific users/groups
+Audit logs for sensitive documents
+Time-limited access grants
+Custom role creation
+8. Notification System
+Document upload completion notifications
+New document alerts for followed categories
+Weekly digest of new knowledge
+@mentions notifications
+Processing failure alerts
+Search result updates for saved queries
+9. Export & Sharing
+Export chat conversations as PDF
+Share answer + citations via email
+Generate shareable links with expiry
+Export document library as CSV
+Create knowledge snapshots
+Print-friendly answer formatting
+10. AI Assistant Improvements
+Voice input for questions
+Multi-language support
+Suggested follow-up questions
+"I don't know" responses when confidence is low
+Source confidence indicators
+Alternative phrasings for unclear questions
+💡 Advanced Features
+11. Knowledge Graph & Relationships
+Visual document relationship mapping
+Concept extraction and linking
+Entity recognition (people, places, dates)
+Topic clustering visualization
+Knowledge gap identification
+Semantic similarity browser
+12. Integration & Automation
+Slack/Teams bot integration
+Email-to-document upload
+Scheduled document imports (SharePoint, Drive)
+API webhooks for document updates
+Calendar integration for meeting notes
+Browser extension for quick search
+13. Quality & Maintenance Tools
+Document freshness indicators
+Outdated content alerts
+Content quality scoring
+Broken link checker
+Spelling and grammar checker
+Automated content review workflows
+14. Advanced RAG Features
+Multi-hop reasoning (combine info from multiple docs)
+Comparative analysis ("compare X and Y")
+Summarization modes (brief, detailed, bullet points)
+Answer refinement ("explain simpler", "more technical")
+Source diversity enforcement
+Citation chain visualization
+15. Mobile & Accessibility
+Progressive Web App (PWA)
+Offline mode for cached documents
+Voice output for answers (text-to-speech)
+High contrast themes
+Font size controls
+Screen reader optimization
+Gesture controls for mobile
+🔧 Quick Wins (Low-effort, High-impact)
+16. UI/UX Improvements
+Dark mode toggle
+Recently viewed documents
+Search history with quick replay
+Keyboard shortcuts (Cmd+K for search)
+Document preview thumbnails
+Drag-to-reorder document list
+Empty state illustrations
+Loading state improvements
+17. Smart Defaults & Suggestions
+Auto-save draft questions
+Popular questions widget
+"People also asked" section
+Quick action buttons ("Summarize this doc")
+Document templates for uploads
+Smart search suggestions while typing
+18. Performance Optimizations
+Infinite scroll for document library
+Virtual scrolling for large result sets
+Image optimization and lazy loading
+Progressive document loading
+Search result caching
+Prefetch likely next documents
+📊 Recommended Implementation Priority
+Phase 1 (Next Sprint)
+Conversational chat with history
+Document preview/viewer
+Dark mode
+Search history
+Phase 2 (1-2 months) 5. Advanced filtering & sorting 6. User analytics dashboard 7. Notification system 8. Export capabilities Phase 3 (3-6 months) 9. Collaborative features 10. Enhanced RBAC 11. Integration with Slack/Teams 12. Knowledge graph visualization Phase 4 (6+ months) 13. Mobile app (PWA) 14. Advanced RAG features 15. Multi-language support 16. Enterprise integrations Would you like me to implement any of these features? I'd recommend starting with conversational chat (already in your TODO) as it would significantly improve the user experience and make the AI assistant feel more natural and helpful.
+
+
+
+- history button is displaying in main searchbox cpvering the search button
+- document preview (pdf) not working

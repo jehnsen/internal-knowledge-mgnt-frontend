@@ -6,36 +6,47 @@ import {
   Search,
   Upload,
   FileText,
-  Brain,
   Sparkles,
   MessageSquare,
-  ChevronRight,
-  Filter,
-  SortDesc
+  History,
+  Clock,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DocumentAPI, SearchAPI, Document as APIDocument, SearchResponse, SearchResult } from "@/lib/api";
-import { CitationCard } from "@/components/CitationCard";
 import { Citation } from "@/lib/types";
 import { DocumentModal } from "@/components/DocumentModal";
 import { DocumentUpload } from "@/components/DocumentUpload";
+import { useAuth } from "@/contexts/AuthContext";
+import { canUploadDocuments, canAccessChat } from "@/lib/rbac";
+import { addToSearchHistory, getSearchHistory, removeFromSearchHistory, addToRecentlyViewed, getRecentlyViewed, SearchHistoryItem, RecentlyViewedDocument } from "@/lib/storage";
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const userRole = user?.role as 'guest' | 'employee' | 'admin' | undefined;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
   const [documents, setDocuments] = useState<APIDocument[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<{
     doc: any;
     result?: SearchResult;
   } | null>(null);
+  const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedDocument[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Load search history and recently viewed from localStorage
+  useEffect(() => {
+    setSearchHistory(getSearchHistory());
+    setRecentlyViewed(getRecentlyViewed());
+  }, []);
 
   // Load recent documents on mount
   useEffect(() => {
@@ -54,19 +65,27 @@ export default function Dashboard() {
   }, []);
 
   // Perform AI search
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
+  const handleSearch = async (e?: React.FormEvent, queryOverride?: string) => {
+    e?.preventDefault();
+    const query = queryOverride || searchQuery;
+    if (!query.trim()) return;
 
     setIsSearching(true);
+    setSearchQuery(query);
+    setShowHistory(false);
+
     try {
       const response = await SearchAPI.search({
-        query: searchQuery,
-        use_rag: true,
-        top_k: 10,
+        query,
+        generate_answer: true,
+        limit: 10,
       });
-      console.log('Search response:', response);
+      console.log('Hybrid search response:', response);
       setSearchResults(response);
+
+      // Add to search history
+      addToSearchHistory(query, response.total_results || 0);
+      setSearchHistory(getSearchHistory());
     } catch (err) {
       console.error('Search failed:', err);
     } finally {
@@ -74,21 +93,29 @@ export default function Dashboard() {
     }
   };
 
-  // Convert search results to citations
-  const citations: Citation[] = searchResults?.results
-    ? searchResults.results
-        .filter(result => result && (result.document || result.title))
-        .map((result, index) => {
-          // Handle both formats: nested document or flat result
-          const doc = result.document || result;
-          return {
-            documentId: doc.id || index,
-            documentName: doc.title || 'Untitled Document',
-            chunkId: `chunk_${doc.id || index}_${index}`,
-            content: result.chunk_content || (doc.content ? doc.content.substring(0, 200) + '...' : 'No content available'),
-            relevanceScore: result.similarity_score || 0,
-          };
-        })
+  const handleDocumentView = (doc: any, result?: SearchResult) => {
+    setSelectedDocument({ doc, result });
+
+    // Add to recently viewed
+    if (doc.id && doc.title) {
+      addToRecentlyViewed({
+        id: typeof doc.id === 'number' ? doc.id : parseInt(doc.id),
+        title: doc.title,
+        fileType: doc.file_type,
+      });
+      setRecentlyViewed(getRecentlyViewed());
+    }
+  };
+
+  // Convert source_documents to citations for display
+  const citations: Citation[] = searchResults?.source_documents
+    ? searchResults.source_documents.map((source, index) => ({
+        documentId: source.document_id,
+        documentName: source.title,
+        chunkId: `chunk_${source.document_id}_${source.chunk_index ?? index}`,
+        content: source.filename, // Show filename as preview
+        relevanceScore: source.relevance_score,
+      }))
     : [];
 
   const [showUpload, setShowUpload] = useState(false);
@@ -106,8 +133,11 @@ export default function Dashboard() {
                   AI-Powered Semantic Search
                 </span>
               </div>
-              <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 bg-clip-text text-transparent">
+              {/* <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 bg-clip-text text-transparent">
                 What would you like to know?
+              </h1> */}
+              <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-red-900 via-red-600 to-red-400 bg-clip-text text-transparent">
+                Access Hire Australia
               </h1>
               <p className="text-xl text-muted-foreground">
                 Search your knowledge base using natural language
@@ -115,16 +145,31 @@ export default function Dashboard() {
             </div>
 
             {/* Search Bar */}
-            <form onSubmit={handleSearch} className="max-w-3xl mx-auto animate-slide-in-from-bottom">
+            <form onSubmit={handleSearch} className="max-w-3xl mx-auto animate-slide-in-from-bottom relative">
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-blue-600 transition-colors" />
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowHistory(true)}
                   placeholder="Ask anything... e.g., 'What is the remote work policy?'"
-                  className="pl-12 pr-32 h-14 text-lg shadow-lg border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 rounded-2xl transition-all"
+                  className="pl-12 pr-44 h-14 text-lg shadow-lg border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 rounded-2xl transition-all"
                   disabled={isSearching}
                 />
+                {/* <div className="absolute right-32 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {searchHistory.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowHistory(!showHistory)}
+                      className="h-8"
+                    >
+                      <History className="h-4 w-4 mr-1" />
+                      History
+                    </Button>
+                  )}
+                </div> */}
                 <Button
                   type="submit"
                   disabled={isSearching || !searchQuery.trim()}
@@ -143,28 +188,83 @@ export default function Dashboard() {
                   )}
                 </Button>
               </div>
+
+              {/* Search History Dropdown */}
+              {showHistory && searchHistory.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-background border-2 rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
+                  <div className="p-3 border-b bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Recent Searches
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowHistory(false)}
+                        className="h-6 w-6 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    {searchHistory.slice(0, 10).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer group"
+                        onClick={() => handleSearch(undefined, item.query)}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm truncate">{item.query}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(item.timestamp).toLocaleDateString()} • {item.resultsCount} results
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeFromSearchHistory(item.query);
+                            setSearchHistory(getSearchHistory());
+                          }}
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </form>
 
             {/* Quick Actions */}
             <div className="max-w-3xl mx-auto mt-6 flex gap-3 justify-center flex-wrap">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowUpload(true)}
-                className="gap-2 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-purple-500/10 hover:border-blue-500/50 transition-all"
-              >
-                <Upload className="h-4 w-4" />
-                Upload Document
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAIAssistant(!showAIAssistant)}
-                className="hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-pink-500/10 hover:border-purple-500/50 transition-all"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                {showAIAssistant ? 'Hide' : 'Show'} Chat Assistant
-              </Button>
+              {canUploadDocuments(userRole) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowUpload(true)}
+                  className="gap-2 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-purple-500/10 hover:border-blue-500/50 transition-all"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload Document
+                </Button>
+              )}
+              {canAccessChat(userRole) && (
+                <Link href="/knowledge">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-pink-500/10 hover:border-purple-500/50 transition-all"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Chat Assistant
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </section>
@@ -174,116 +274,96 @@ export default function Dashboard() {
           {searchResults && (
             <div className="mb-12 animate-fade-in">
               {/* AI Answer */}
-              {searchResults.rag_response && (
-                <Card className="mb-6 border-primary/50 shadow-lg">
+              {searchResults.answer && (
+                <Card className="mb-6 border-2 border-blue-500/30 shadow-xl bg-gradient-to-br from-white to-blue-50/30 animate-slide-in-from-bottom">
                   <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                        <Brain className="h-5 w-5 text-white" />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
+                          <Sparkles className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-xl">AI-Generated Answer</CardTitle>
+                          <CardDescription>Powered by {searchResults.search_method} search • {searchResults.execution_time.toFixed(2)}s</CardDescription>
+                        </div>
                       </div>
-                      <div>
-                        <CardTitle>AI Answer</CardTitle>
-                        <CardDescription>Generated from your documents</CardDescription>
-                      </div>
+                      <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                        {citations.length} Source{citations.length !== 1 ? 's' : ''}
+                      </Badge>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-lg leading-relaxed mb-4">{searchResults.rag_response}</p>
+                    <div className="prose prose-sm max-w-none mb-4">
+                      {searchResults.answer.split('\n').map((paragraph, idx) => {
+                        const trimmed = paragraph.trim();
+                        if (!trimmed) return null;
+
+                        return (
+                          <p key={idx} className="text-base leading-relaxed text-foreground/90 mb-3">
+                            {trimmed}
+                          </p>
+                        );
+                      })}
+                    </div>
                     {citations.length > 0 && (
-                      <div className="border-t pt-4">
-                        <p className="text-sm font-medium mb-3 text-muted-foreground">
-                          Sources ({citations.length})
-                        </p>
-                        <div className="grid gap-3">
-                          {citations.slice(0, 3).map((citation, idx) => (
-                            <CitationCard key={idx} citation={citation} index={idx} />
-                          ))}
+                      <div className="border-t pt-4 mt-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-semibold flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            Source Documents (sorted by relevance)
+                          </p>
                         </div>
-                        {citations.length > 3 && (
-                          <Button variant="link" className="mt-2">
-                            View all {citations.length} sources
-                            <ChevronRight className="h-4 w-4 ml-1" />
-                          </Button>
-                        )}
+                        <div className="grid gap-2">
+                          {citations.map((citation, idx) => {
+                            // Find the full document from results array
+                            const fullDocument = searchResults.results?.find(r => r.document_id === citation.documentId);
+
+                            return (
+                              <div
+                                key={idx}
+                                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted hover:shadow-md transition-all cursor-pointer group"
+                                onClick={() => {
+                                  if (fullDocument) {
+                                    handleDocumentView({
+                                      id: fullDocument.document_id,
+                                      title: fullDocument.title,
+                                      content: fullDocument.content,
+                                      created_at: fullDocument.created_at,
+                                      category: fullDocument.category,
+                                      tags: fullDocument.tags,
+                                      file_type: fullDocument.file_type,
+                                    }, fullDocument);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="flex-1 overflow-hidden">
+                                    <p className="text-xs italic font-bold text-muted-foreground group-hover:text-blue-600 transition-colors">
+                                      (Source: {citation.documentName})
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge className={`flex-shrink-0 ${
+                                  citation.relevanceScore >= 0.7 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' : ''
+                                }${
+                                  citation.relevanceScore >= 0.4 && citation.relevanceScore < 0.7 ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : ''
+                                }${
+                                  citation.relevanceScore < 0.4 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white' : ''
+                                }`}>
+                                  {Math.round(citation.relevanceScore * 100)}%
+                                </Badge>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               )}
 
-              {/* Document Results */}
-              {searchResults.results && searchResults.results.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold">
-                      Document Results ({searchResults.total_results})
-                    </h2>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Filter className="h-4 w-4 mr-2" />
-                        Filter
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <SortDesc className="h-4 w-4 mr-2" />
-                        Sort
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {searchResults.results
-                      .filter(result => result && (result.document || result.title))
-                      .map((result, index) => {
-                        // Handle both formats: nested document or flat result
-                        const doc = result.document || result;
-                        const confidenceScore = Math.round((result.similarity_score || 0) * 100);
-                        return (
-                          <Card
-                            key={index}
-                            className="group hover:shadow-xl hover:border-blue-500/50 hover:-translate-y-1 transition-all cursor-pointer bg-gradient-to-br from-white to-blue-50/30 animate-slide-in-from-bottom"
-                            style={{ animationDelay: `${index * 50}ms` }}
-                            onClick={() => setSelectedDocument({ doc, result })}
-                          >
-                            <CardHeader>
-                              <div className="flex items-start justify-between gap-2">
-                                <FileText className="h-5 w-5 text-blue-600 flex-shrink-0 mt-1 group-hover:scale-110 transition-transform" />
-                                <Badge
-                                  className={`text-xs ${
-                                    confidenceScore >= 80 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' :
-                                    confidenceScore >= 60 ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' :
-                                    'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
-                                  }`}
-                                >
-                                  {confidenceScore}% match
-                                </Badge>
-                              </div>
-                              <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
-                                {doc.title || 'Untitled Document'}
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="text-sm text-muted-foreground line-clamp-3">
-                                {result.chunk_content || (doc.content ? doc.content.substring(0, 150) + '...' : 'No content available')}
-                              </p>
-                              <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                                <span>
-                                  {doc.created_at ? new Date(doc.created_at).toLocaleDateString() : 'N/A'}
-                                </span>
-                                {doc.category && (
-                                  <Badge variant="outline" className="capitalize">
-                                    {doc.category}
-                                  </Badge>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
               {/* No results message */}
-              {searchResults && (!searchResults.results || searchResults.results.length === 0) && !searchResults.rag_response && (
+              {searchResults && (!searchResults.results || searchResults.results.length === 0) && !searchResults.answer && (
                 <Card className="text-center py-12">
                   <CardContent>
                     <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
@@ -305,12 +385,14 @@ export default function Dashboard() {
                   <h2 className="text-2xl font-bold">Recent Documents</h2>
                   <p className="text-muted-foreground">Your latest uploads and updates</p>
                 </div>
-                <Link href="/knowledge">
-                  <Button>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload New
-                  </Button>
-                </Link>
+                {canUploadDocuments(userRole) && (
+                  <Link href="/knowledge">
+                    <Button>
+                      <Upload className="h-4 w-4 mr-2" />
+                      Upload New
+                    </Button>
+                  </Link>
+                )}
               </div>
 
               {isLoadingDocs ? (
@@ -326,7 +408,7 @@ export default function Dashboard() {
                       key={doc.id}
                       className="hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group animate-fade-in"
                       style={{ animationDelay: `${index * 50}ms` }}
-                      onClick={() => setSelectedDocument({ doc })}
+                      onClick={() => handleDocumentView(doc)}
                     >
                       <CardHeader>
                         <div className="flex items-start gap-3">
@@ -380,47 +462,13 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* AI Assistant Sidebar (Collapsible) */}
-        {showAIAssistant && (
-          <div className="fixed right-0 top-16 bottom-0 w-96 bg-background border-l shadow-2xl z-40 animate-slide-in-from-right">
-            <div className="h-full flex flex-col">
-              <div className="p-4 border-b flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  <h3 className="font-semibold">AI Assistant</h3>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAIAssistant(false)}
-                >
-                  ✕
-                </Button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4">
-                <Alert>
-                  <Brain className="h-4 w-4" />
-                  <AlertDescription>
-                    Use the search bar above for quick answers, or go to the{' '}
-                    <Link href="/knowledge" className="text-primary hover:underline">
-                      AI Assistant page
-                    </Link>{' '}
-                    for a full conversation interface.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Document Modal */}
         {selectedDocument && (
           <DocumentModal
             isOpen={!!selectedDocument}
             onClose={() => setSelectedDocument(null)}
             document={selectedDocument.doc}
-            similarityScore={selectedDocument.result?.similarity_score}
-            chunkContent={selectedDocument.result?.chunk_content}
+            result={selectedDocument.result}
             searchQuery={searchQuery}
           />
         )}

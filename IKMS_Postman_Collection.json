@@ -1,0 +1,833 @@
+{
+  "info": {
+    "name": "IKMS - Internal Knowledge Management System",
+    "description": "Complete API collection for IKMS with Authentication, Document Management, Search, Hybrid Search, Chat Assistant, and more",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "document_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('access_token', jsonData.access_token);",
+                  "    console.log('Access token saved:', jsonData.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"tony\",\n  \"password\": \"your-password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Login to get access token. Token is automatically saved to collection variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"username\": \"newuser\",\n  \"password\": \"SecurePass123!\",\n  \"full_name\": \"New User\",\n  \"role\": \"viewer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"your-refresh-token\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Create Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Sample Document\",\n  \"content\": \"This is the document content with important information.\",\n  \"summary\": \"A sample document for testing\",\n  \"category\": \"Technical\",\n  \"tags\": [\"sample\", \"test\", \"documentation\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", ""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/?skip=0&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", ""],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "category",
+                  "value": "Technical",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Document by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", "{{document_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Document Title\",\n  \"content\": \"Updated content\",\n  \"summary\": \"Updated summary\",\n  \"category\": \"Technical\",\n  \"tags\": [\"updated\", \"test\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", "{{document_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/documents/{{document_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "documents", "{{document_id}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "Upload Document File",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "category",
+                  "value": "Technical",
+                  "type": "text"
+                },
+                {
+                  "key": "tags",
+                  "value": "pdf,documentation",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/upload/document",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "upload", "document"]
+            },
+            "description": "Upload PDF, Word, Excel, CSV, or TXT file. Auto-extracts text and generates embeddings."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Supported Formats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/upload/supported-formats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "upload", "supported-formats"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Semantic Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What is Zen Spa?\",\n  \"limit\": 10,\n  \"category\": null,\n  \"tags\": null,\n  \"use_rag\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/search/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "search", ""]
+            },
+            "description": "Semantic search using vector embeddings"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Search History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/search/history",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "search", "history"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Hybrid Search",
+      "item": [
+        {
+          "name": "Hybrid Search with RAG",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What is Zen Spa?\",\n  \"limit\": 10,\n  \"alpha\": 0.5,\n  \"use_chunks\": true,\n  \"generate_answer\": true,\n  \"category\": null,\n  \"tags\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hybrid-search/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hybrid-search", ""]
+            },
+            "description": "Hybrid search combining keyword + semantic search with AI answer generation. Alpha: 0=keyword, 0.5=balanced, 1=semantic"
+          },
+          "response": []
+        },
+        {
+          "name": "Hybrid Search - Keyword Heavy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"MRT breakdown\",\n  \"limit\": 10,\n  \"alpha\": 0.3,\n  \"use_chunks\": true,\n  \"generate_answer\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hybrid-search/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hybrid-search", ""]
+            },
+            "description": "Keyword-heavy search (alpha=0.3) for exact terms and acronyms"
+          },
+          "response": []
+        },
+        {
+          "name": "Hybrid Search - Semantic Heavy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"How to improve system performance?\",\n  \"limit\": 10,\n  \"alpha\": 0.7,\n  \"use_chunks\": true,\n  \"generate_answer\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/hybrid-search/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hybrid-search", ""]
+            },
+            "description": "Semantic-heavy search (alpha=0.7) for conceptual queries"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Hybrid Search Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/hybrid-search/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "hybrid-search", "status"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat Assistant",
+      "item": [
+        {
+          "name": "Start New Chat",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('session_id', jsonData.session_id);",
+                  "    console.log('Session ID saved:', jsonData.session_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What is Zen Spa?\",\n  \"use_knowledge_base\": true,\n  \"max_history\": 10,\n  \"search_limit\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", ""]
+            },
+            "description": "Start a new conversation. Session ID is automatically saved."
+          },
+          "response": []
+        },
+        {
+          "name": "Continue Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"What services do they offer?\",\n  \"session_id\": \"{{session_id}}\",\n  \"use_knowledge_base\": true,\n  \"max_history\": 10,\n  \"search_limit\": 5\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", ""]
+            },
+            "description": "Continue existing conversation using saved session_id"
+          },
+          "response": []
+        },
+        {
+          "name": "Chat - Pure Conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Tell me a joke\",\n  \"use_knowledge_base\": false,\n  \"max_history\": 10\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", ""]
+            },
+            "description": "General conversation without knowledge base"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Chat Sessions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/sessions?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", "sessions"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Session Messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/sessions/{{session_id}}/messages",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", "sessions", "{{session_id}}", "messages"]
+            },
+            "description": "Get full conversation history for a session"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Chat Session",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/sessions/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", "sessions", "{{session_id}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Chat Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/chat/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "chat", "status"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Get Analytics Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/overview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics", "overview"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Top Documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/top-documents?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics", "top-documents"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Search Trends",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/search-trends?days=30",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics", "search-trends"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Metrics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/metrics",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "metrics"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tagging",
+      "item": [
+        {
+          "name": "Analyze Document for Tags",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Database Configuration Guide\",\n  \"content\": \"This guide explains how to configure PostgreSQL database connections...\",\n  \"existing_tags\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/tagging/analyze",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tagging", "analyze"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Popular Tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/tagging/popular?limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "tagging", "popular"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "item": [
+        {
+          "name": "Get Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/audit/logs?skip=0&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "audit", "logs"],
+              "query": [
+                {
+                  "key": "skip",
+                  "value": "0"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "action",
+                  "value": "document_upload",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "GDPR",
+      "item": [
+        {
+          "name": "Export User Data",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gdpr/export",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gdpr", "export"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User Account",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gdpr/delete-account",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gdpr", "delete-account"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Retention",
+      "item": [
+        {
+          "name": "Get Retention Policies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/retention/policies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "retention", "policies"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Retention Policy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Archive Old Documents\",\n  \"category\": \"Technical\",\n  \"retention_days\": 365,\n  \"action\": \"archive\",\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/retention/policies",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "retention", "policies"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "API Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "API Documentation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/docs",
+              "host": ["{{base_url}}"],
+              "path": ["docs"]
+            },
+            "description": "Opens OpenAPI/Swagger documentation"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

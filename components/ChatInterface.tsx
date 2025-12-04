@@ -50,40 +50,27 @@ export function ChatInterface({ conversationId, onQuery }: ChatInterfaceProps) {
     setError(null);
 
     try {
-      // Call the real search API with RAG enabled
+      // Call the hybrid search API with answer generation
       const response = await SearchAPI.search({
         query,
-        use_rag: true,
-        top_k: 5,
+        generate_answer: true,
+        limit: 5,
       });
 
-      console.log('Search API response:', response);
+      console.log('Hybrid search response:', response);
 
-      // Convert search results to citations
-      // Handle both possible response formats from backend
-      const citations: Citation[] = (response.results || [])
-        .filter(result => {
-          if (!result) return false;
-          // Backend might return document or doc_metadata
-          return result.document || result.doc_metadata;
-        })
-        .map((result, index) => {
-          // Handle different backend response formats
-          const doc = result.document || result.doc_metadata || {};
-          const docId = doc.id || index;
-
-          return {
-            documentId: docId,
-            documentName: doc.title || doc.filename || 'Untitled Document',
-            pageNumber: doc.num_pages ? undefined : undefined,
-            chunkId: `chunk_${docId}_${index}`,
-            content: result.chunk_content || result.content || (doc.content ? doc.content.substring(0, 200) + '...' : 'No content available'),
-            relevanceScore: result.similarity_score || 0,
-          };
-        });
+      // Convert source_documents to citations
+      const citations: Citation[] = (response.source_documents || []).map((source, index) => ({
+        documentId: source.document_id,
+        documentName: source.title,
+        pageNumber: undefined,
+        chunkId: `chunk_${source.document_id}_${source.chunk_index ?? index}`,
+        content: `${source.filename} • ${source.file_type}`,
+        relevanceScore: source.relevance_score,
+      }));
 
       // Check if backend returned an AI-generated answer
-      let assistantContent = response.rag_response;
+      let assistantContent = response.answer;
 
       // If no RAG response, create a helpful answer from the search results
       if (!assistantContent && citations.length > 0) {

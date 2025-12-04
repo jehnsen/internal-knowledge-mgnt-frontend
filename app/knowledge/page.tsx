@@ -5,13 +5,15 @@ import { MessageSquare, Upload, Library } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ChatInterface } from "@/components/ChatInterface";
+import { ConversationalChat } from "@/components/ConversationalChat";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { DocumentList } from "@/components/DocumentList";
 import { LoadingState } from "@/components/LoadingState";
 import { Document as APIDocument, DocumentAPI } from "@/lib/api";
 import { Document as UIDocument } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { canUploadDocuments, canDeleteDocuments, canAccessChat } from "@/lib/rbac";
 
 type Tab = 'chat' | 'upload' | 'documents';
 
@@ -63,6 +65,9 @@ const mockDocuments: UIDocument[] = [
 ];
 
 export default function KnowledgePage() {
+  const { user } = useAuth();
+  const userRole = user?.role as 'guest' | 'employee' | 'admin' | undefined;
+
   const [activeTab, setActiveTab] = useState<Tab>('chat');
   const [documents, setDocuments] = useState<UIDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,11 +129,14 @@ export default function KnowledgePage() {
     fetchDocuments();
   };
 
-  const tabs = [
-    { id: 'chat' as Tab, label: 'Ask Questions', icon: MessageSquare },
-    { id: 'upload' as Tab, label: 'Upload Documents', icon: Upload },
-    { id: 'documents' as Tab, label: 'Document Library', icon: Library },
+  // Filter tabs based on user permissions
+  const allTabs = [
+    { id: 'chat' as Tab, label: 'Ask Questions', icon: MessageSquare, permission: () => canAccessChat(userRole) },
+    { id: 'upload' as Tab, label: 'Upload Documents', icon: Upload, permission: () => canUploadDocuments(userRole) },
+    { id: 'documents' as Tab, label: 'Document Library', icon: Library, permission: () => true }, // Everyone can view
   ];
+
+  const tabs = allTabs.filter(tab => tab.permission());
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/20 to-blue-50/30">
@@ -223,15 +231,15 @@ export default function KnowledgePage() {
       {/* Tab Content */}
       <div className="min-h-[600px]">
         {activeTab === 'chat' && (
-          <Card className="h-[600px] flex flex-col">
-            <CardHeader>
-              <CardTitle>Ask Questions</CardTitle>
+          <Card className="h-[700px] flex flex-col overflow-hidden">
+            <CardHeader className="border-b">
+              <CardTitle>AI Chat Assistant</CardTitle>
               <CardDescription>
-                Get answers from your documents using AI-powered search with source citations
+                Have a natural conversation with context-aware responses and source citations
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 overflow-hidden p-0">
-              <ChatInterface />
+            <CardContent className="flex-1 p-0 overflow-hidden">
+              <ConversationalChat />
             </CardContent>
           </Card>
         )}
@@ -271,7 +279,7 @@ export default function KnowledgePage() {
               ) : (
                 <DocumentList
                   documents={documents}
-                  onDelete={handleDeleteDocument}
+                  onDelete={canDeleteDocuments(userRole) ? handleDeleteDocument : undefined}
                   onView={handleViewDocument}
                 />
               )}

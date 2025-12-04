@@ -6,7 +6,10 @@
       "Bash(npm run build:*)",
       "Bash(npm run dev:*)",
       "Bash(taskkill:*)",
-      "Bash(timeout /t 2 /nobreak)"
+      "Bash(timeout /t 2 /nobreak)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest add tabs)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

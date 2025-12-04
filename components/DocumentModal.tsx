@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { X, ExternalLink, FileText, User, Calendar, BarChart3, File } from "lucide-react";
+import { X, ExternalLink, FileText, User, Calendar, BarChart3, File, Download } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DownloadAPI } from "@/lib/api";
 import Link from "next/link";
 
 // Helper function to format document content
@@ -122,6 +124,7 @@ interface DocumentModalProps {
   similarityScore?: number;
   chunkContent?: string;
   searchQuery?: string; // Add search query for highlighting
+  result?: any; // For new hybrid search result format
 }
 
 export function DocumentModal({
@@ -131,14 +134,29 @@ export function DocumentModal({
   similarityScore,
   chunkContent,
   searchQuery,
+  result,
 }: DocumentModalProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("content");
 
   const handleFullscreen = () => {
     setIsFullscreen(true);
     onClose();
     // Navigate to full page view
     window.open(`/documents/${document.id}`, '_blank');
+  };
+
+  const handleDownload = async () => {
+    if (!document.id) return;
+    try {
+      setIsDownloading(true);
+      await DownloadAPI.downloadDocument(document.id, document.title);
+    } catch (error) {
+      console.error('Download failed:', error);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const uploader = document.metadata?.uploader || document.metadata?.uploaded_by || 'Unknown';
@@ -150,7 +168,9 @@ export function DocumentModal({
     minute: '2-digit',
   }) : 'N/A';
 
-  const confidenceScore = similarityScore ? Math.round(similarityScore * 100) : 0;
+  // Handle both old and new response formats
+  const score = result?.relevance_score ?? similarityScore ?? 0;
+  const confidenceScore = Math.round(score * 100);
 
   // Extract keywords from search query for highlighting
   const searchTerms = searchQuery
@@ -254,44 +274,106 @@ export function DocumentModal({
 
         {/* Content Section */}
         <div className="flex-1 overflow-y-auto py-4">
-          {chunkContent && (
-            <div className="mb-6 animate-fade-in">
-              <div className="flex items-center gap-2 mb-3">
-                <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
-                  Relevant Excerpt
-                </Badge>
-                {similarityScore !== undefined && (
-                  <span className="text-xs text-muted-foreground">
-                    {Math.round(similarityScore * 100)}% match
-                  </span>
+          {document.id && document.file_type?.toLowerCase().includes('pdf') ? (
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+                <TabsTrigger value="preview">PDF Preview</TabsTrigger>
+                <TabsTrigger value="content">Text Content</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="preview" className="flex-1 mt-0">
+                <div className="h-[500px] border rounded-lg overflow-hidden bg-muted/30">
+                  <iframe
+                    src={`${DownloadAPI.getDocumentDownloadUrl(document.id)}#view=FitH`}
+                    className="w-full h-full"
+                    title={document.title}
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="content" className="flex-1 mt-0 overflow-y-auto">
+                {chunkContent && (
+                  <div className="mb-6 animate-fade-in">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                        Relevant Excerpt
+                      </Badge>
+                      {similarityScore !== undefined && (
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round(similarityScore * 100)}% match
+                        </span>
+                      )}
+                    </div>
+                    <div className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 border-l-4 border-blue-500 p-5 rounded-r-xl shadow-sm">
+                      <div className="space-y-3">
+                        {parseStructuredContent(chunkContent, searchTerms)}
+                      </div>
+                    </div>
+                  </div>
                 )}
+
+                <div className="mb-3 flex items-center gap-2">
+                  <h3 className="text-sm font-semibold">Full Document Content</h3>
+                  {searchTerms.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Highlighting: {searchTerms.join(', ')}
+                    </Badge>
+                  )}
+                  <Separator className="flex-1" />
+                </div>
+                <div className="prose prose-sm max-w-none bg-muted/30 p-6 rounded-xl">
+                  <div className="space-y-3">
+                    {document.content ? (
+                      parseStructuredContent(document.content, searchTerms)
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic">No content available</p>
+                    )}
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <>
+              {chunkContent && (
+                <div className="mb-6 animate-fade-in">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                      Relevant Excerpt
+                    </Badge>
+                    {similarityScore !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(similarityScore * 100)}% match
+                      </span>
+                    )}
+                  </div>
+                  <div className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 border-l-4 border-blue-500 p-5 rounded-r-xl shadow-sm">
+                    <div className="space-y-3">
+                      {parseStructuredContent(chunkContent, searchTerms)}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="mb-3 flex items-center gap-2">
+                <h3 className="text-sm font-semibold">Full Document Content</h3>
+                {searchTerms.length > 0 && (
+                  <Badge variant="outline" className="text-xs">
+                    Highlighting: {searchTerms.join(', ')}
+                  </Badge>
+                )}
+                <Separator className="flex-1" />
               </div>
-              <div className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 border-l-4 border-blue-500 p-5 rounded-r-xl shadow-sm">
+              <div className="prose prose-sm max-w-none bg-muted/30 p-6 rounded-xl">
                 <div className="space-y-3">
-                  {parseStructuredContent(chunkContent, searchTerms)}
+                  {document.content ? (
+                    parseStructuredContent(document.content, searchTerms)
+                  ) : (
+                    <p className="text-sm text-muted-foreground italic">No content available</p>
+                  )}
                 </div>
               </div>
-            </div>
+            </>
           )}
-
-          <div className="mb-3 flex items-center gap-2">
-            <h3 className="text-sm font-semibold">Full Document Content</h3>
-            {searchTerms.length > 0 && (
-              <Badge variant="outline" className="text-xs">
-                Highlighting: {searchTerms.join(', ')}
-              </Badge>
-            )}
-            <Separator className="flex-1" />
-          </div>
-          <div className="prose prose-sm max-w-none bg-muted/30 p-6 rounded-xl">
-            <div className="space-y-3">
-              {document.content ? (
-                parseStructuredContent(document.content, searchTerms)
-              ) : (
-                <p className="text-sm text-muted-foreground italic">No content available</p>
-              )}
-            </div>
-          </div>
 
           {/* Additional Metadata */}
           {document.metadata && Object.keys(document.metadata).length > 0 && (
@@ -323,18 +405,20 @@ export function DocumentModal({
             </Button>
           </div>
           <div className="flex gap-2">
+            {document.id && (
+              <Button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                {isDownloading ? 'Downloading...' : 'Download'}
+              </Button>
+            )}
             <Button variant="outline" onClick={handleFullscreen}>
               <ExternalLink className="h-4 w-4 mr-2" />
               Open Fullscreen
             </Button>
-            {document.file_path && (
-              <Button asChild>
-                <a href={document.file_path} download target="_blank" rel="noopener noreferrer">
-                  <FileText className="h-4 w-4 mr-2" />
-                  Download
-                </a>
-              </Button>
-            )}
           </div>
         </div>
       </DialogContent>
