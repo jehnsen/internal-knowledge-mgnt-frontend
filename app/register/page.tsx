@@ -44,7 +44,7 @@ export default function RegisterPage() {
       await register(formData.username, formData.email, formData.password, formData.fullName);
       // Small delay to ensure auth state updates
       setTimeout(() => {
-        router.replace("/dashboard");
+        router.replace("/search");
       }, 100);
     } catch (err: any) {
       setError(err.message || "Failed to create account. Please try again.");

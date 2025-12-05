@@ -27,8 +27,8 @@ export function Navigation() {
   const userRole = user?.role as 'guest' | 'employee' | 'admin' | undefined;
 
   const navItems = [
-    { href: "/dashboard", label: "Search", icon: Search },
-    { href: "/knowledge", label: "Chat", icon: Bot },
+    { href: "/search", label: "Search", icon: Search },
+    { href: "/chat", label: "Chat", icon: Bot },
     { href: "/admin", label: "Dashboard", icon: BarChart3 },
   ];
 
@@ -47,7 +47,7 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="flex items-center gap-2 group">
+            <Link href="/search" className="flex items-center gap-2 group">
               <div className="p-2 bg-gradient-to-br from-red-600 to-red-400 rounded-lg shadow-lg group-hover:shadow-xl transition-all">
                 <Bot className="h-5 w-5 text-white" />
               </div>

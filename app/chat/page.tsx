@@ -140,94 +140,7 @@ export default function KnowledgePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/20 to-blue-50/30">
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8 animate-fade-in">
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-            Document Library
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            Manage your knowledge base and upload new documents
-          </p>
-        </div>
-
-        {error && (
-          <Alert variant="destructive" className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="border-2 hover:border-purple-500/50 hover:shadow-lg transition-all bg-gradient-to-br from-white to-purple-50/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Documents</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                    {documents.length}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
-                  <Library className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-green-500/50 hover:shadow-lg transition-all bg-gradient-to-br from-white to-green-50/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Indexed</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                    {documents.filter(d => d.status === 'indexed').length}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
-                  <div className="h-3 w-3 rounded-full bg-white animate-pulse" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 hover:border-blue-500/50 hover:shadow-lg transition-all bg-gradient-to-br from-white to-blue-50/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Processing</p>
-                  <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    {documents.filter(d => d.status === 'processing').length}
-                  </p>
-                </div>
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center">
-                  <div className="h-6 w-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex gap-2 mb-6 border-b border-gradient">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            return (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? "default" : "ghost"}
-              className={cn(
-                "gap-2 rounded-b-none transition-all",
-                activeTab === tab.id && "bg-gradient-to-r from-purple-600 to-blue-600 text-white border-b-2 border-purple-600"
-              )}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </Button>
-          );
-        })}
-      </div>
-
+     
       {/* Tab Content */}
       <div className="min-h-[600px]">
         {activeTab === 'chat' && (
@@ -288,6 +201,6 @@ export default function KnowledgePage() {
         )}
       </div>
       </div>
-    </div>
+
   );
 }

@@ -16,8 +16,8 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const { login } = useAuth();
   const [formData, setFormData] = useState({
-    username: "",
-    password: "",
+    username: "tony",
+    password: "ironman",
   });
   const [error, setError] = useState("");
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState("");
@@ -39,7 +39,7 @@ function LoginForm() {
       await login(formData.username, formData.password);
       // Small delay to ensure auth state updates
       setTimeout(() => {
-        router.replace("/dashboard");
+        router.replace("/search");
       }, 100);
     } catch (err: any) {
       setError(err.message || "Failed to login. Please check your credentials.");

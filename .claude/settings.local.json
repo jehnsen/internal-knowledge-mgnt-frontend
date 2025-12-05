@@ -9,7 +9,9 @@
       "Bash(timeout /t 2 /nobreak)",
       "Bash(npm install:*)",
       "Bash(npx shadcn@latest add tabs)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

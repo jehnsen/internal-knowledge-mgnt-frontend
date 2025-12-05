@@ -26,10 +26,10 @@ export default function LandingPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Redirect to dashboard if already logged in
+  // Redirect to search if already logged in
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.push("/dashboard");
+      router.push("/search");
     }
   }, [isAuthenticated, isLoading, router]);
 
