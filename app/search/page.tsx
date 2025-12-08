@@ -11,6 +11,8 @@ import {
   History,
   Clock,
   X,
+  Eye,
+  TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,9 +20,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { DocumentAPI, SearchAPI, Document as APIDocument, SearchResponse, SearchResult } from "@/lib/api";
+import { AuditLog } from "@/lib/audit";
 import { Citation } from "@/lib/types";
 import { DocumentModal } from "@/components/DocumentModal";
 import { DocumentUpload } from "@/components/DocumentUpload";
+import { KnowledgeGapAlert } from "@/components/KnowledgeGapAlert";
 import { useAuth } from "@/contexts/AuthContext";
 import { canUploadDocuments, canAccessChat } from "@/lib/rbac";
 import { addToSearchHistory, getSearchHistory, removeFromSearchHistory, addToRecentlyViewed, getRecentlyViewed, SearchHistoryItem, RecentlyViewedDocument } from "@/lib/storage";
@@ -86,6 +90,9 @@ export default function Dashboard() {
       // Add to search history
       addToSearchHistory(query, response.total_results || 0);
       setSearchHistory(getSearchHistory());
+
+      // Log audit event
+      await AuditLog.search(query, response.total_results || 0);
     } catch (err) {
       console.error('Search failed:', err);
     } finally {
@@ -104,6 +111,12 @@ export default function Dashboard() {
         fileType: doc.file_type,
       });
       setRecentlyViewed(getRecentlyViewed());
+
+      // Log audit event
+      AuditLog.documentView(
+        typeof doc.id === 'number' ? doc.id : parseInt(doc.id),
+        doc.title
+      );
     }
   };
 
@@ -119,6 +132,32 @@ export default function Dashboard() {
     : [];
 
   const [showUpload, setShowUpload] = useState(false);
+
+  // Helper function to detect knowledge gaps
+  const isKnowledgeGap = (results: SearchResponse | null): boolean => {
+    if (!results) return false;
+
+    // Check if no results or very few results
+    const hasNoResults = !results.results || results.results.length === 0;
+    const hasVeryFewResults = results.total_results === 0 || results.total_results < 2;
+
+    // Check if answer indicates knowledge gap
+    const knowledgeGapPhrases = [
+      "don't have enough information",
+      "cannot find",
+      "no information",
+      "insufficient information",
+      "not found in",
+      "unable to find",
+      "no relevant information",
+      "knowledge base does not contain",
+    ];
+    const answerIndicatesGap = results.answer
+      ? knowledgeGapPhrases.some(phrase => results.answer.toLowerCase().includes(phrase))
+      : false;
+
+    return (hasNoResults || hasVeryFewResults) && (!results.answer || answerIndicatesGap);
+  };
 
   return (
     <ProtectedRoute>
@@ -287,7 +326,10 @@ export default function Dashboard() {
                           <CardDescription>Powered by {searchResults.search_method} search • {searchResults.execution_time.toFixed(2)}s</CardDescription>
                         </div>
                       </div>
-                      <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+                      <Badge className={citations.length === 0
+                        ? "bg-gradient-to-r from-red-500 to-orange-500 text-white"
+                        : "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                      }>
                         {citations.length} Source{citations.length !== 1 ? 's' : ''}
                       </Badge>
                     </div>
@@ -316,7 +358,7 @@ export default function Dashboard() {
                         <div className="grid gap-2">
                           {citations.map((citation, idx) => {
                             // Find the full document from results array
-                            const fullDocument = searchResults.results?.find(r => r.document_id === citation.documentId);
+                            const fullDocument = !isKnowledgeGap(searchResults) && searchResults.results?.find(r => r.document_id === citation.documentId);
 
                             return (
                               <div
@@ -362,102 +404,177 @@ export default function Dashboard() {
                 </Card>
               )}
 
-              {/* No results message */}
-              {searchResults && (!searchResults.results || searchResults.results.length === 0) && !searchResults.answer && (
-                <Card className="text-center py-12">
-                  <CardContent>
-                    <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No results found</h3>
-                    <p className="text-muted-foreground mb-6">
-                      Try adjusting your search query or upload more documents
-                    </p>
-                  </CardContent>
-                </Card>
+              {/* Knowledge Gap Alert or No results message */}
+              {searchResults && isKnowledgeGap(searchResults) && (
+                <KnowledgeGapAlert
+                  query={searchQuery}
+                  message={searchResults.answer || "I couldn't find relevant information in the knowledge base to answer your question. This might be because the information doesn't exist in our documents yet, or it needs to be phrased differently."}
+                  onUploadClick={canUploadDocuments(userRole) ? () => setShowUpload(true) : undefined}
+                  onRefineQuery={() => {
+                    // Focus on search input
+                    document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
+                  }}
+                  className="animate-fade-in"
+                />
               )}
             </div>
           )}
 
-          {/* Recent Documents (when no search) */}
+          {/* Recently Viewed & Recent Documents (when no search) */}
           {!searchResults && (
-            <div>
-              <div className="flex items-center justify-between mb-6">
+            <div className="space-y-12">
+              {/* Recently Viewed Documents */}
+              {recentlyViewed && recentlyViewed.length > 0 && (
                 <div>
-                  <h2 className="text-2xl font-bold">Recent Documents</h2>
-                  <p className="text-muted-foreground">Your latest uploads and updates</p>
-                </div>
-                {canUploadDocuments(userRole) && (
-                  <Link href="/knowledge">
-                    <Button>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Upload New
-                    </Button>
-                  </Link>
-                )}
-              </div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <Eye className="h-6 w-6 text-blue-600" />
+                        Recently Viewed
+                      </h2>
+                      <p className="text-muted-foreground">Documents you've opened recently</p>
+                    </div>
+                  </div>
 
-              {isLoadingDocs ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
-                  ))}
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {recentlyViewed.slice(0, 6).map((viewedDoc, index) => {
+                      // Find full document from documents array
+                      const fullDoc = documents?.find(d => d.id === viewedDoc.id);
+
+                      return (
+                        <Card
+                          key={viewedDoc.id}
+                          className="hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group animate-fade-in border-l-4 border-l-blue-500"
+                          style={{ animationDelay: `${index * 50}ms` }}
+                          onClick={() => fullDoc && handleDocumentView(fullDoc)}
+                        >
+                          <CardHeader>
+                            <div className="flex items-start gap-3">
+                              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                <Eye className="h-5 w-5 text-blue-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-lg group-hover:text-blue-600 transition-colors line-clamp-1">
+                                  {viewedDoc.title}
+                                </CardTitle>
+                                <CardDescription className="text-xs flex items-center gap-1 mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  Viewed {new Date(viewedDoc.timestamp).toLocaleDateString()}
+                                </CardDescription>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {fullDoc && (
+                              <>
+                                <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                                  {fullDoc.content.substring(0, 100)}...
+                                </p>
+                                <Badge variant="secondary" className="text-xs">
+                                  {viewedDoc.fileType || fullDoc.file_type || 'Document'}
+                                </Badge>
+                              </>
+                            )}
+                            {!fullDoc && (
+                              <p className="text-xs text-muted-foreground italic">
+                                Click to view document details
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : documents && documents.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {documents.map((doc, index) => (
-                    <Card
-                      key={doc.id}
-                      className="hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group animate-fade-in"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                      onClick={() => handleDocumentView(doc)}
-                    >
-                      <CardHeader>
-                        <div className="flex items-start gap-3">
-                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                            <FileText className="h-5 w-5 text-primary" />
+              )}
+
+              {/* Recent Uploads Section */}
+              {(documents && documents.length > 0) && (
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <TrendingUp className="h-6 w-6 text-green-600" />
+                        Latest Updates
+                      </h2>
+                      <p className="text-muted-foreground">Recent additions to the knowledge base</p>
+                    </div>
+                    {canUploadDocuments(userRole) && (
+                      <Link href="/knowledge">
+                        <Button>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload New
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+
+                  {isLoadingDocs ? (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                      <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
+                    ))}
+                  </div>
+                ) : documents && documents.length > 0 ? (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {documents.slice(0, 6).map((doc, index) => (
+                      <Card
+                        key={doc.id}
+                        className="hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group animate-fade-in border-l-4 border-l-green-500"
+                        style={{ animationDelay: `${index * 50}ms` }}
+                        onClick={() => handleDocumentView(doc)}
+                      >
+                        <CardHeader>
+                          <div className="flex items-start gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                              <TrendingUp className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-lg group-hover:text-green-600 transition-colors line-clamp-1">
+                                {doc.title}
+                              </CardTitle>
+                              <CardDescription className="text-xs flex items-center gap-1">
+                                <Upload className="h-3 w-3" />
+                                {new Date(doc.created_at).toLocaleDateString()}
+                              </CardDescription>
+                            </div>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg group-hover:text-primary transition-colors line-clamp-1">
-                              {doc.title}
-                            </CardTitle>
-                            <CardDescription className="text-xs">
-                              {new Date(doc.created_at).toLocaleDateString()}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground line-clamp-3">
-                          {doc.content.substring(0, 150)}...
-                        </p>
-                        <div className="mt-4">
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                            {doc.content.substring(0, 100)}...
+                          </p>
                           <Badge
                             variant={doc.embedding && doc.embedding.length > 0 ? "default" : "secondary"}
                             className="text-xs"
                           >
                             {doc.embedding && doc.embedding.length > 0 ? 'Indexed' : 'Processing'}
                           </Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card className="text-center py-12">
-                  <CardContent>
-                    <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">No documents yet</h3>
-                    <p className="text-muted-foreground mb-6">
-                      Upload your first document to get started
-                    </p>
-                    <Link href="/knowledge">
-                      <Button size="lg">
-                        <Upload className="h-5 w-5 mr-2" />
-                        Upload Document
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="text-center py-12">
+                    <CardContent>
+                      <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold mb-2">No documents yet</h3>
+                      <p className="text-muted-foreground mb-6">
+                        Upload your first document to get started
+                      </p>
+                      {canUploadDocuments(userRole) && (
+                        <Link href="/knowledge">
+                          <Button size="lg">
+                            <Upload className="h-5 w-5 mr-2" />
+                            Upload Document
+                          </Button>
+                        </Link>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
             </div>
           )}
         </div>

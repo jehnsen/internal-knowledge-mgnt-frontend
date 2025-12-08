@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { AuthAPI, User } from "@/lib/api";
+import { AuditLog } from "@/lib/audit";
 
 interface AuthContextType {
   user: User | null;
@@ -41,9 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await AuthAPI.login({ username, password });
     const currentUser = await AuthAPI.getCurrentUser();
     setUser(currentUser);
+
+    // Log audit event for successful login
+    await AuditLog.login(currentUser.id, currentUser.username);
   };
 
   const logout = () => {
+    // Log audit event before logout (while user is still available)
+    if (user) {
+      AuditLog.logout(user.id, user.username);
+    }
+
     AuthAPI.logout();
     setUser(null);
   };
@@ -55,6 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       full_name: fullName,
     });
+
+    // Log audit event for registration
+    await AuditLog.register(newUser.id, newUser.username, newUser.email);
+
     // Auto-login after registration
     await login(username, password);
   };

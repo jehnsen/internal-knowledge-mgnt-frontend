@@ -1,87 +1,269 @@
 "use client";
 
-import { Settings, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Settings, Clock, Download, Eye, UserX } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-
-interface UserActivity {
-  user_id: number;
-  username: string;
-  email: string;
-  last_login?: string;
-  search_count: number;
-  chat_count: number;
-  document_uploads: number;
-}
-
-// Mock data - replace with API call when backend is ready
-const mockUsers: UserActivity[] = [
-  {
-    user_id: 1,
-    username: "admin",
-    email: "admin@company.com",
-    last_login: new Date().toISOString(),
-    search_count: 45,
-    chat_count: 23,
-    document_uploads: 12
-  }
-];
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { GDPRAPI, User, UserActivityData } from "@/lib/api";
+import { AuditLog } from "@/lib/audit";
+import { toast } from "sonner";
 
 export default function UsersPage() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [userActivity, setUserActivity] = useState<UserActivityData | null>(null);
+  const [showActivityDialog, setShowActivityDialog] = useState(false);
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await GDPRAPI.getUsers(0, 100);
+      setUsers(response.items || []);
+    } catch (err) {
+      console.warn('Users endpoint not yet implemented, using empty array');
+      setUsers([]);
+      toast.error('Failed to load users. Backend endpoint may not be implemented yet.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewActivity = async (user: User) => {
+    try {
+      setLoading(true);
+      setSelectedUser(user);
+
+      const activity = await GDPRAPI.getUserActivity(user.id);
+      setUserActivity(activity);
+      setShowActivityDialog(true);
+
+      // Log audit event
+      await AuditLog.adminUserView(user.id, user.username);
+    } catch (err: any) {
+      console.error('Failed to load user activity:', err);
+      toast.error(err.message || 'Failed to load user activity. Backend endpoint may not be implemented yet.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportUserData = async (user: User) => {
+    try {
+      setLoading(true);
+      toast.info('Preparing user data export...');
+
+      await GDPRAPI.downloadUserData(user.id, user.username);
+
+      toast.success(`Exported data for ${user.username}`);
+    } catch (err: any) {
+      console.error('Export failed:', err);
+      toast.error(err.message || 'Failed to export user data. Backend endpoint may not be implemented yet.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">User Management</h1>
         <p className="text-muted-foreground">
-          Monitor user activity and manage permissions
+          Monitor user activity and manage permissions ({users.length} users)
         </p>
       </div>
 
-      <Card>
-        <CardContent className="p-6">
-          <div className="space-y-3">
-            {mockUsers.map((user) => (
-              <div
-                key={user.user_id}
-                className="flex items-center justify-between p-4 rounded-lg border bg-card"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                    {user.username.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium">{user.username}</p>
-                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                    {user.last_login && (
+      {loading && users.length === 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-center text-muted-foreground">Loading users...</p>
+          </CardContent>
+        </Card>
+      ) : users.length === 0 ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center text-muted-foreground">
+              <UserX className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              <p>No users found</p>
+              <p className="text-xs mt-1">Users endpoint may not be implemented on the backend yet</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-3">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                      {user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{user.username}</p>
+                        {user.role === 'admin' && (
+                          <span className="text-xs bg-purple-500/10 text-purple-600 px-2 py-0.5 rounded">
+                            Admin
+                          </span>
+                        )}
+                        {!user.is_active && (
+                          <span className="text-xs bg-red-500/10 text-red-600 px-2 py-0.5 rounded">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
                       <p className="text-xs text-muted-foreground mt-1">
                         <Clock className="h-3 w-3 inline mr-1" />
-                        Last login: {new Date(user.last_login).toLocaleString()}
+                        Created: {new Date(user.created_at).toLocaleDateString()}
                       </p>
-                    )}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleViewActivity(user)}
+                      disabled={loading}
+                      title="View User Activity"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleExportUserData(user)}
+                      disabled={loading}
+                      title="Export User Data (GDPR)"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      title="User Settings"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex gap-4 items-center">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-blue-600">{user.search_count}</p>
-                    <p className="text-xs text-muted-foreground">Searches</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-green-600">{user.chat_count}</p>
-                    <p className="text-xs text-muted-foreground">Chats</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-purple-600">{user.document_uploads}</p>
-                    <p className="text-xs text-muted-foreground">Uploads</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    <Settings className="h-4 w-4" />
-                  </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* User Activity Dialog */}
+      <Dialog open={showActivityDialog} onOpenChange={setShowActivityDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>User Activity - {selectedUser?.username}</DialogTitle>
+            <DialogDescription>
+              Detailed activity information and GDPR data
+            </DialogDescription>
+          </DialogHeader>
+
+          {userActivity && (
+            <div className="space-y-4">
+              {/* User Info */}
+              <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-accent/20">
+                <div>
+                  <p className="text-xs text-muted-foreground">Email</p>
+                  <p className="font-medium">{userActivity.email}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Full Name</p>
+                  <p className="font-medium">{userActivity.full_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Account Created</p>
+                  <p className="font-medium">{new Date(userActivity.created_at).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Last Login</p>
+                  <p className="font-medium">
+                    {userActivity.last_login
+                      ? new Date(userActivity.last_login).toLocaleString()
+                      : 'Never'}
+                  </p>
                 </div>
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+
+              {/* Activity Stats */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="p-4 border rounded-lg text-center">
+                  <p className="text-2xl font-bold text-blue-600">{userActivity.search_count}</p>
+                  <p className="text-xs text-muted-foreground">Searches</p>
+                </div>
+                <div className="p-4 border rounded-lg text-center">
+                  <p className="text-2xl font-bold text-green-600">{userActivity.chat_count}</p>
+                  <p className="text-xs text-muted-foreground">Chat Sessions</p>
+                </div>
+                <div className="p-4 border rounded-lg text-center">
+                  <p className="text-2xl font-bold text-purple-600">{userActivity.document_uploads}</p>
+                  <p className="text-xs text-muted-foreground">Uploads</p>
+                </div>
+              </div>
+
+              {/* Data Sections */}
+              <div className="space-y-2">
+                <div className="p-3 border rounded-lg">
+                  <p className="font-medium mb-1">Search History</p>
+                  <p className="text-sm text-muted-foreground">
+                    {userActivity.search_history.length} search queries recorded
+                  </p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="font-medium mb-1">Chat Sessions</p>
+                  <p className="text-sm text-muted-foreground">
+                    {userActivity.chat_sessions.length} chat sessions recorded
+                  </p>
+                </div>
+                <div className="p-3 border rounded-lg">
+                  <p className="font-medium mb-1">Uploaded Documents</p>
+                  <p className="text-sm text-muted-foreground">
+                    {userActivity.uploaded_documents.length} documents uploaded
+                  </p>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  onClick={() => handleExportUserData(selectedUser!)}
+                  disabled={loading}
+                  className="flex-1"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export User Data
+                </Button>
+                <Button
+                  onClick={() => setShowActivityDialog(false)}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {!userActivity && (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Loading user activity...</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

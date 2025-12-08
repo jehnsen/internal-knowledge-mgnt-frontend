@@ -8,7 +8,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ChatAPI, ChatMessage, ChatSession, SourceDocument, DocumentAPI, Document as APIDocument } from "@/lib/api";
+import { AuditLog } from "@/lib/audit";
 import { DocumentModal } from "@/components/DocumentModal";
+import { KnowledgeGapAlert } from "@/components/KnowledgeGapAlert";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -30,6 +32,32 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Helper function to detect knowledge gaps in assistant responses
+  const isKnowledgeGapMessage = (message: ChatMessage): boolean => {
+    if (message.role !== 'assistant') return false;
+
+    const knowledgeGapPhrases = [
+      "don't have enough information",
+      "cannot find",
+      "no information",
+      "insufficient information",
+      "not found in",
+      "unable to find",
+      "no relevant information",
+      "knowledge base does not contain",
+      "no documents about",
+      "don't have any information about",
+      "couldn't find anything about",
+    ];
+
+    const content = message.content.toLowerCase();
+    const hasGapPhrase = knowledgeGapPhrases.some(phrase => content.includes(phrase));
+    const hasNoSources = !message.sources || message.sources.length === 0;
+
+    // Knowledge gap if it has gap phrases OR has no sources and is a short response
+    return hasGapPhrase || (hasNoSources && message.content.length < 200);
   };
 
   useEffect(() => {
@@ -78,6 +106,9 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
         setSessionId(null);
       }
       toast.success('Conversation deleted');
+
+      // Log audit event
+      await AuditLog.chatSessionDelete(sessionIdToDelete);
     } catch (err: any) {
       toast.error('Failed to delete conversation');
       console.error(err);
@@ -151,8 +182,11 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
       });
 
       // Update session ID if this is a new conversation
-      if (!sessionId) {
+      const isNewSession = !sessionId;
+      if (isNewSession) {
         setSessionId(response.session_id);
+        // Log audit event for new chat session
+        await AuditLog.chatSessionStart(response.session_id);
       }
 
       const assistantMessage: ChatMessage = {
@@ -163,6 +197,9 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+
+      // Log audit event for chat message
+      await AuditLog.chatMessage(response.session_id, query.length);
 
       // Reload sessions to show the new one
       loadSessions();
@@ -299,23 +336,37 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
                 )}
 
                 <div className={cn(
-                  "flex flex-col gap-2 max-w-[80%]",
+                  "flex flex-col gap-2",
+                  message.role === 'assistant' && isKnowledgeGapMessage(message) ? "w-full" : "max-w-[80%]",
                   message.role === 'user' && "items-end"
                 )}>
-                  <Card className={cn(
-                    "shadow-sm",
-                    message.role === 'user'
-                      ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white border-none"
-                      : "bg-card"
-                  )}>
-                    <CardContent className="p-4">
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                        {message.content}
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {/* Show KnowledgeGapAlert for assistant messages with knowledge gaps */}
+                  {message.role === 'assistant' && isKnowledgeGapMessage(message) ? (
+                    <KnowledgeGapAlert
+                      query={idx > 0 ? messages[idx - 1].content : "your question"}
+                      message={message.content}
+                      onRefineQuery={() => {
+                        // Focus on input field
+                        document.querySelector<HTMLInputElement>('input[placeholder*="question"]')?.focus();
+                      }}
+                    />
+                  ) : (
+                    <Card className={cn(
+                      "shadow-sm",
+                      message.role === 'user'
+                        ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white border-none"
+                        : "bg-card"
+                    )}>
+                      <CardContent className="p-4">
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                          {message.content}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
 
-                  {message.sources && message.sources.length > 0 && (
+                  {/* Only show sources if NOT a knowledge gap message */}
+                  {message.sources && message.sources.length > 0 && !isKnowledgeGapMessage(message) && (
                     <div className="w-full space-y-2 px-1">
                       {/* Top source (highest relevance) as clickable link */}
                       <div className="text-xs text-muted-foreground">

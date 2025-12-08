@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { DocumentAPI } from "@/lib/api";
+import { AuditLog } from "@/lib/audit";
 import { cn } from "@/lib/utils";
 
 interface UploadFile {
@@ -144,6 +145,13 @@ export function DocumentUpload({ onUploadComplete }: DocumentUploadProps) {
             tags
           } : f
         ));
+
+        // Log audit event for successful upload
+        await AuditLog.documentUpload(
+          uploadedDoc.id,
+          uploadedDoc.title || uploadFile.file.name,
+          uploadedDoc.file_type || uploadFile.file.type
+        );
       } catch (error: any) {
         console.error('Upload failed:', error);
 

@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DocumentAPI, Document } from "@/lib/api";
+import { AuditLog } from "@/lib/audit";
 import { LoadingState } from "@/components/LoadingState";
 import { DocumentTable } from "@/components/admin/documents/DocumentTable";
 import { DocumentCards } from "@/components/admin/documents/DocumentCards";
@@ -42,9 +43,17 @@ export default function DocumentsPage() {
     if (!confirm('Are you sure you want to delete this document?')) return;
 
     try {
+      // Find document details before deletion
+      const doc = documents.find(d => d.id === docId);
+
       await DocumentAPI.deleteDocument(docId);
       toast.success('Document deleted successfully');
       setDocuments(documents.filter(d => d.id !== docId));
+
+      // Log audit event
+      if (doc) {
+        await AuditLog.documentDelete(docId, doc.title);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete document');
     }

@@ -629,6 +629,80 @@ export class AnalyticsAPI {
   }
 }
 
+// Audit API
+export interface AuditStats {
+  total_logs: number;
+  logs_by_action: Record<string, number>;
+  logs_by_resource: Record<string, number>;
+  unique_users: number;
+  date_range: {
+    earliest: string;
+    latest: string;
+  };
+}
+
+export class AuditAPI {
+  // Get all audit logs (admin only)
+  static async getAuditLogs(
+    skip: number = 0,
+    limit: number = 100,
+    userId?: number
+  ): Promise<PaginatedResponse<AuditLog> | AuditLog[]> {
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+    });
+
+    if (userId) {
+      params.append('user_id', userId.toString());
+    }
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/audit/logs?${params}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<PaginatedResponse<AuditLog> | AuditLog[]>(response);
+  }
+
+  // Get current user's audit logs
+  static async getMyAuditLogs(
+    skip: number = 0,
+    limit: number = 100
+  ): Promise<PaginatedResponse<AuditLog> | AuditLog[]> {
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/audit/logs/me?${params}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<PaginatedResponse<AuditLog> | AuditLog[]>(response);
+  }
+
+  // Get audit statistics
+  static async getAuditStats(): Promise<AuditStats> {
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/audit/stats`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<AuditStats>(response);
+  }
+}
+
 // Download API
 export class DownloadAPI {
   static getDocumentDownloadUrl(documentId: number): string {
@@ -660,5 +734,213 @@ export class DownloadAPI {
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  }
+}
+
+// GDPR & Privacy API
+export interface UserActivityData {
+  user_id: number;
+  username: string;
+  email: string;
+  full_name: string;
+  created_at: string;
+  last_login?: string;
+  search_count: number;
+  chat_count: number;
+  document_uploads: number;
+  search_history: any[];
+  chat_sessions: any[];
+  uploaded_documents: any[];
+}
+
+export interface AuditLog {
+  id: number;
+  user_id: number;
+  username: string;
+  action: string;
+  resource_type: string;
+  resource_id?: number;
+  details?: string;
+  ip_address?: string;
+  timestamp: string;
+}
+
+export interface DataDeletionRequest {
+  user_id: number;
+  reason?: string;
+  delete_documents?: boolean;
+  delete_chat_history?: boolean;
+  delete_search_history?: boolean;
+}
+
+export interface GDPRStats {
+  total_users: number;
+  total_documents: number;
+  total_searches: number;
+  total_chat_sessions: number;
+  total_audit_logs: number;
+  data_retention_days: number;
+}
+
+export class GDPRAPI {
+  // Get GDPR data summary/stats
+  static async getStats(): Promise<GDPRStats> {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/gdpr/data-summary`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    return handleResponse<GDPRStats>(response);
+  }
+
+  // Export user data (for data portability - GDPR Article 20)
+  static async exportUserData(userId?: number): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.append('user_id', userId.toString());
+    }
+
+    const endpoint = `${API_BASE_URL}${API_VERSION}/gdpr/data-export${params.toString() ? '?' + params.toString() : ''}`;
+
+    const response = await fetch(endpoint, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export user data');
+    }
+
+    return await response.blob();
+  }
+
+  // Export user data as CSV
+  static async exportUserDataCSV(userId?: number): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (userId) {
+      params.append('user_id', userId.toString());
+    }
+
+    const endpoint = `${API_BASE_URL}${API_VERSION}/gdpr/data-export-csv${params.toString() ? '?' + params.toString() : ''}`;
+
+    const response = await fetch(endpoint, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export user data as CSV');
+    }
+
+    return await response.blob();
+  }
+
+  // Download exported user data
+  static async downloadUserData(userId?: number, username?: string): Promise<void> {
+    const blob = await this.exportUserData(userId);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `user_data_${username || userId || 'me'}_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  // Export audit logs
+  static async exportAuditLogs(startDate?: string, endDate?: string): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+
+    const endpoint = `${API_BASE_URL}${API_VERSION}/gdpr/audit-logs/export?${params}`;
+
+    const response = await fetch(endpoint, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to export audit logs');
+    }
+
+    return await response.blob();
+  }
+
+  // Download audit logs
+  static async downloadAuditLogs(startDate?: string, endDate?: string): Promise<void> {
+    const blob = await this.exportAuditLogs(startDate, endDate);
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit_logs_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  }
+
+  // Request data deletion (Right to be forgotten - GDPR Article 17)
+  static async requestDataDeletion(request: DataDeletionRequest): Promise<{ message: string; request_id?: number }> {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/gdpr/delete-my-data`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(request),
+    });
+
+    return handleResponse<{ message: string; request_id?: number }>(response);
+  }
+
+  // Get privacy report
+  static async getPrivacyReport(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/gdpr/privacy-report`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    return handleResponse<any>(response);
+  }
+
+  // Get consent status
+  static async getConsentStatus(): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}${API_VERSION}/gdpr/consent-status`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+    });
+
+    return handleResponse<any>(response);
+  }
+
+  // Get user activity data
+  static async getUserActivity(userId: number): Promise<UserActivityData> {
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/users/${userId}/activity`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<UserActivityData>(response);
+  }
+
+  // Get all users (admin only)
+  static async getUsers(skip: number = 0, limit: number = 100): Promise<PaginatedResponse<User>> {
+    const params = new URLSearchParams({
+      skip: skip.toString(),
+      limit: limit.toString(),
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}${API_VERSION}/users?${params}`,
+      {
+        headers: getAuthHeaders(),
+        credentials: 'include',
+      }
+    );
+
+    return handleResponse<PaginatedResponse<User>>(response);
   }
 }
