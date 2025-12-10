@@ -28,6 +28,8 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set());
   const [selectedDocument, setSelectedDocument] = useState<{ doc: any; source?: SourceDocument } | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -45,11 +47,21 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
       "insufficient information",
       "not found in",
       "unable to find",
+      "unable to provide",
       "no relevant information",
       "knowledge base does not contain",
       "no documents about",
       "don't have any information about",
       "couldn't find anything about",
+      "no direct mention",
+      "does not specify",
+      "context does not specify",
+      "i am unable to",
+      "cannot provide",
+      "no specific",
+      "not mentioned",
+      "no details about",
+      "not available in",
     ];
 
     const content = message.content.toLowerCase();
@@ -71,11 +83,16 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
 
   const loadSessions = async () => {
     try {
+      setSessionsLoading(true);
+      setSessionsError(null);
       const data = await ChatAPI.getSessions(20, 0);
       setSessions(Array.isArray(data) ? data : []);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load sessions:', err);
+      setSessionsError(err.message || 'Failed to load conversation history. Backend may not be running.');
       setSessions([]);
+    } finally {
+      setSessionsLoading(false);
     }
   };
 
@@ -240,10 +257,38 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">
-          {!Array.isArray(sessions) || sessions.length === 0 ? (
+          {sessionsLoading ? (
             <div className="text-center py-8 px-4">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+              <p className="text-xs text-muted-foreground">
+                Loading conversations...
+              </p>
+            </div>
+          ) : sessionsError ? (
+            <div className="px-4 py-6">
+              <Alert variant="destructive" className="mb-3">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  {sessionsError}
+                </AlertDescription>
+              </Alert>
+              <Button
+                onClick={loadSessions}
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+              >
+                Retry
+              </Button>
+            </div>
+          ) : !Array.isArray(sessions) || sessions.length === 0 ? (
+            <div className="text-center py-8 px-4">
+              <History className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
               <p className="text-xs text-muted-foreground">
                 No previous conversations
+              </p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Start a new chat to begin
               </p>
             </div>
           ) : (

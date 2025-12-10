@@ -100,7 +100,7 @@ export default function AuditLogsPage() {
 
   const uniqueActions = Array.from(new Set(auditLogs.map(log => log.action)));
 
-  return auditLogs && (
+  return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Audit Logs & System Activity</h1>

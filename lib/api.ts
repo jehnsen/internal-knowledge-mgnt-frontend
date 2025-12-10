@@ -535,7 +535,18 @@ export class ChatAPI {
       }
     );
 
-    return handleResponse<ChatSession[]>(response);
+    const data = await handleResponse<any>(response);
+
+    // Handle both paginated and array response formats
+    if (Array.isArray(data)) {
+      return data;
+    } else if (data && data.sessions && Array.isArray(data.sessions)) {
+      return data.sessions;
+    } else if (data && data.items && Array.isArray(data.items)) {
+      return data.items;
+    }
+
+    return [];
   }
 
   static async getSessionMessages(sessionId: string): Promise<ChatMessage[]> {
