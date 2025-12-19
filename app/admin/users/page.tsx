@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Settings, Clock, Download, Eye, UserX } from "lucide-react";
+import { Settings, Clock, Download, Eye, UserX, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { GDPRAPI, User, UserActivityData } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { GDPRAPI, AuthAPI, User, UserActivityData, RegisterRequest } from "@/lib/api";
 import { AuditLog } from "@/lib/audit";
 import { toast } from "sonner";
 
@@ -15,6 +17,13 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [userActivity, setUserActivity] = useState<UserActivityData | null>(null);
   const [showActivityDialog, setShowActivityDialog] = useState(false);
+  const [showAddUserDialog, setShowAddUserDialog] = useState(false);
+  const [newUser, setNewUser] = useState<RegisterRequest>({
+    username: '',
+    email: '',
+    password: '',
+    full_name: '',
+  });
 
   useEffect(() => {
     loadUsers();
@@ -24,7 +33,8 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const response = await GDPRAPI.getUsers(0, 100);
-      setUsers(response.items || []);
+      setUsers(response.users || []);
+      if (response) console.log('Loaded users:', response.users);
     } catch (err) {
       console.warn('Users endpoint not yet implemented, using empty array');
       setUsers([]);
@@ -69,13 +79,71 @@ export default function UsersPage() {
     }
   };
 
+  const handleAddUser = async () => {
+    // Validate form
+    if (!newUser.username || !newUser.email || !newUser.password || !newUser.full_name) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newUser.email)) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    // Validate password length
+    if (newUser.password.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const createdUser = await AuthAPI.register(newUser);
+
+      toast.success(`User ${createdUser.username} created successfully`);
+
+      // Reset form
+      setNewUser({
+        username: '',
+        email: '',
+        password: '',
+        full_name: '',
+      });
+
+      setShowAddUserDialog(false);
+
+      // Reload users list
+      await loadUsers();
+
+      // Log audit event
+      await AuditLog.adminUserCreate(createdUser.id, createdUser.username);
+    } catch (err: any) {
+      console.error('Failed to create user:', err);
+      toast.error(err.message || 'Failed to create user. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold mb-2">User Management</h1>
-        <p className="text-muted-foreground">
-          Monitor user activity and manage permissions ({users.length} users)
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">User Management</h1>
+          <p className="text-muted-foreground">
+            Monitor user activity and manage permissions ({users.length} users)
+          </p>
+        </div>
+        <Button
+          onClick={() => setShowAddUserDialog(true)}
+          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add User
+        </Button>
       </div>
 
       {loading && users.length === 0 ? (
@@ -105,7 +173,7 @@ export default function UsersPage() {
                 >
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                      {user.username.charAt(0).toUpperCase()}
+                      {user.username && user.username.charAt(0).toUpperCase() || ''}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -262,6 +330,98 @@ export default function UsersPage() {
               <p className="text-muted-foreground">Loading user activity...</p>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add User Dialog */}
+      <Dialog open={showAddUserDialog} onOpenChange={setShowAddUserDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New User</DialogTitle>
+            <DialogDescription>
+              Create a new user account. All fields are required.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="johndoe"
+                value={newUser.username}
+                onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="full_name">Full Name</Label>
+              <Input
+                id="full_name"
+                type="text"
+                placeholder="John Doe"
+                value={newUser.full_name}
+                onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+                disabled={loading}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Min. 6 characters"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                disabled={loading}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Password must be at least 6 characters long
+              </p>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button
+                onClick={handleAddUser}
+                disabled={loading}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                {loading ? 'Creating...' : 'Create User'}
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowAddUserDialog(false);
+                  setNewUser({
+                    username: '',
+                    email: '',
+                    password: '',
+                    full_name: '',
+                  });
+                }}
+                variant="outline"
+                disabled={loading}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

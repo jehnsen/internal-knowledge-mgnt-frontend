@@ -136,6 +136,14 @@ export interface PaginatedResponse<T> {
   pages: number;
 }
 
+export interface PaginatedUserResponse<T> {
+  users: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
 // Chat Session Types
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -669,7 +677,7 @@ export class AuditAPI {
     }
 
     const response = await fetch(
-      `${API_BASE_URL}${API_VERSION}/audit/logs?${params}`,
+      `${API_BASE_URL}${API_VERSION}/audit/log?${params}`,
       {
         headers: getAuthHeaders(),
         credentials: 'include',
@@ -938,7 +946,7 @@ export class GDPRAPI {
   }
 
   // Get all users (admin only)
-  static async getUsers(skip: number = 0, limit: number = 100): Promise<PaginatedResponse<User>> {
+  static async getUsers(skip: number = 0, limit: number = 100): Promise<PaginatedUserResponse<User>> {
     const params = new URLSearchParams({
       skip: skip.toString(),
       limit: limit.toString(),
@@ -952,6 +960,28 @@ export class GDPRAPI {
       }
     );
 
-    return handleResponse<PaginatedResponse<User>>(response);
+    const data = await handleResponse<any>(response);
+
+    if (data.items) {
+      return data;
+    } else if (data.users && Array.isArray(data.users)) {
+      // Backend returns { users: [...], total, skip, limit }
+      return {
+        users: data.users,
+        total: data.total || data.users.length,
+        page: Math.floor(skip / limit) + 1,
+        size: limit,
+        pages: Math.ceil((data.total || data.users.length) / limit),
+      };
+    }
+
+    // Fallback to empty response
+    return {
+      users: [],
+      total: 0,
+      page: 1,
+      size: limit,
+      pages: 0,
+    };
   }
 }

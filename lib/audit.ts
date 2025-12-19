@@ -33,6 +33,7 @@ export enum AuditAction {
 
   // Admin operations
   ADMIN_USER_VIEW = 'ADMIN_USER_VIEW',
+  ADMIN_USER_CREATE = 'ADMIN_USER_CREATE',
   ADMIN_ANALYTICS_VIEW = 'ADMIN_ANALYTICS_VIEW',
   ADMIN_SETTINGS_CHANGE = 'ADMIN_SETTINGS_CHANGE',
 }
@@ -418,6 +419,14 @@ export const AuditLog = {
       resource_id: userId,
       details: `Viewed user details: ${username}`,
     }),
+
+  adminUserCreate: (userId: number, username: string) =>
+    auditLogger.log({
+      action: AuditAction.ADMIN_USER_CREATE,
+      resource_type: ResourceType.ADMIN,
+      resource_id: userId,
+      details: `Created new user: ${username}`,
+    }, true),
 
   adminAnalyticsView: (section: string) =>
     auditLogger.log({
