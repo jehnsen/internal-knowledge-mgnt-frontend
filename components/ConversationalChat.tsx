@@ -13,12 +13,14 @@ import { DocumentModal } from "@/components/DocumentModal";
 import { KnowledgeGapAlert } from "@/components/KnowledgeGapAlert";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ConversationalChatProps {
   className?: string;
 }
 
 export function ConversationalChat({ className }: ConversationalChatProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -76,10 +78,12 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
     scrollToBottom();
   }, [messages]);
 
-  // Load chat sessions on mount
+  // Load chat sessions once the user is authenticated (avoids a race-condition
+  // 401 when the component mounts before _accessToken is set).
   useEffect(() => {
+    if (!user) return;
     loadSessions();
-  }, []);
+  }, [user]);
 
   const loadSessions = async () => {
     try {

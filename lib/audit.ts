@@ -1,7 +1,7 @@
 // Audit Logging Service - Client-side audit tracking and backend synchronization
+// All requests go through the Next.js BFF proxy so tokens stay in HttpOnly cookies.
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_VERSION = '/api/v1';
+const BFF_BASE = '/api/proxy';
 
 // Audit action types
 export enum AuditAction {
@@ -64,26 +64,10 @@ export interface CreateAuditLogRequest {
   metadata?: Record<string, any>;
 }
 
-// Helper function to get auth token
-function getAuthToken(): string | null {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('access_token');
-  }
-  return null;
-}
-
-// Helper function to get auth headers
+// Auth is handled via HttpOnly cookie; the BFF proxy injects the Authorization
+// header before forwarding to the backend, so we only need Content-Type here.
 function getAuthHeaders(): HeadersInit {
-  const token = getAuthToken();
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return headers;
+  return { 'Content-Type': 'application/json' };
 }
 
 // Get client metadata (IP, user agent, etc.)
@@ -104,15 +88,38 @@ function getClientMetadata(): Record<string, any> {
 
 class AuditLogger {
   private static instance: AuditLogger;
+  private static readonly QUEUE_KEY = 'audit_pending_logs';
   private pendingLogs: AuditLogEntry[] = [];
   private isProcessing = false;
   private batchInterval = 5000; // Send logs every 5 seconds
   private maxBatchSize = 10;
 
   private constructor() {
-    // Start batch processing if in browser
     if (typeof window !== 'undefined') {
+      this.loadQueue();           // Restore any events that survived a crash/refresh
       this.startBatchProcessing();
+    }
+  }
+
+  /** Reload the persisted queue from sessionStorage on startup. */
+  private loadQueue(): void {
+    try {
+      const stored = sessionStorage.getItem(AuditLogger.QUEUE_KEY);
+      if (stored) {
+        this.pendingLogs = JSON.parse(stored);
+      }
+    } catch {
+      // sessionStorage unavailable or corrupt — start with an empty queue.
+      this.pendingLogs = [];
+    }
+  }
+
+  /** Persist the current queue to sessionStorage so it survives crashes/refreshes. */
+  private saveQueue(): void {
+    try {
+      sessionStorage.setItem(AuditLogger.QUEUE_KEY, JSON.stringify(this.pendingLogs));
+    } catch {
+      // sessionStorage full or unavailable — best-effort; silently ignore.
     }
   }
 
@@ -129,12 +136,6 @@ class AuditLogger {
    * @param sendImmediately If true, send immediately instead of batching
    */
   public async log(entry: AuditLogEntry, sendImmediately = false): Promise<void> {
-    // Only log if user is authenticated
-    if (!getAuthToken()) {
-      console.debug('Skipping audit log - user not authenticated');
-      return;
-    }
-
     // Add client metadata
     const enhancedEntry = {
       ...entry,
@@ -148,6 +149,7 @@ class AuditLogger {
       await this.sendToBackend(enhancedEntry);
     } else {
       this.pendingLogs.push(enhancedEntry);
+      this.saveQueue(); // Persist so the event survives a crash before the next flush
 
       // If batch is full, send immediately
       if (this.pendingLogs.length >= this.maxBatchSize) {
@@ -166,10 +168,9 @@ class AuditLogger {
    */
   private async sendToBackend(entry: AuditLogEntry): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_VERSION}/audit/log`, {
+      const response = await fetch(`${BFF_BASE}/audit/log`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        credentials: 'include',
         body: JSON.stringify({
           action: entry.action,
           resource_type: entry.resource_type,
@@ -202,10 +203,9 @@ class AuditLogger {
 
     try {
       // Send batch to backend
-      const response = await fetch(`${API_BASE_URL}${API_VERSION}/audit/log/batch`, {
+      const response = await fetch(`${BFF_BASE}/audit/log/batch`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        credentials: 'include',
         body: JSON.stringify({
           logs: logsToSend.map(entry => ({
             action: entry.action,
@@ -222,9 +222,13 @@ class AuditLogger {
       }
     } catch (error) {
       console.debug('Audit log batch backend error:', error);
-      // Re-add logs to queue if failed
+      // Network error — restore logs so they are retried on the next interval.
       this.pendingLogs.unshift(...logsToSend);
     } finally {
+      // Sync storage with the current queue state:
+      //   • success / non-ok drop  → pendingLogs is [] → storage cleared
+      //   • network error restore  → pendingLogs has items → storage updated
+      this.saveQueue();
       this.isProcessing = false;
     }
   }
@@ -251,14 +255,10 @@ class AuditLogger {
           })),
         });
 
-        const token = getAuthToken();
         const blob = new Blob([data], { type: 'application/json' });
 
-        // Try to send with beacon
-        navigator.sendBeacon(
-          `${API_BASE_URL}${API_VERSION}/audit/log/batch`,
-          blob
-        );
+        // sendBeacon to same-origin BFF proxy; cookies are included automatically.
+        navigator.sendBeacon(`${BFF_BASE}/audit/log/batch`, blob);
       }
     });
   }

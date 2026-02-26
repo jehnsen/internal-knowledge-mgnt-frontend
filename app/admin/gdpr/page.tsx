@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { DocumentAPI, GDPRAPI, AuditAPI, User, AuditLog as AuditLogType } from "@/lib/api";
 import { AuditLog } from "@/lib/audit";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
 export default function GDPRPage() {
+  const { user } = useAuth();
   const [documentCount, setDocumentCount] = useState(0);
   const [users, setUsers] = useState<User[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogType[]>([]);
@@ -30,8 +32,9 @@ export default function GDPRPage() {
   const [deleteSearchHistory, setDeleteSearchHistory] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
     try {
@@ -44,7 +47,7 @@ export default function GDPRPage() {
       // Load users list (try to fetch, fallback to mock if endpoint not ready)
       try {
         const usersResponse = await GDPRAPI.getUsers(0, 100);
-        setUsers(usersResponse.items || []);
+        setUsers(usersResponse.users || []);
       } catch (err) {
         console.warn('Users endpoint not yet implemented, using empty array');
         setUsers([]);

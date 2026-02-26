@@ -12,8 +12,10 @@ import { DocumentTable } from "@/components/admin/documents/DocumentTable";
 import { DocumentCards } from "@/components/admin/documents/DocumentCards";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DocumentsPage() {
+  const { user } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchFilter, setSearchFilter] = useState("");
@@ -21,8 +23,9 @@ export default function DocumentsPage() {
   const [showUpload, setShowUpload] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     loadDocuments();
-  }, []);
+  }, [user]);
 
   const loadDocuments = async () => {
     setIsLoading(true);

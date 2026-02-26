@@ -6,6 +6,7 @@ import { LoadingState } from "@/components/LoadingState";
 import { StatsCards } from "@/components/admin/analytics/StatsCards";
 import { PopularQueries } from "@/components/admin/analytics/PopularQueries";
 import { TopDocuments } from "@/components/admin/analytics/TopDocuments";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AnalyticsOverview {
   total_documents: number;
@@ -23,14 +24,16 @@ interface AnalyticsOverview {
 }
 
 export default function AnalyticsPage() {
+  const { user } = useAuth();
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [topDocs, setTopDocs] = useState<TopDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!user) return;
     loadAnalyticsData();
-  }, []);
+  }, [user]);
 
   const loadAnalyticsData = async () => {
     setIsLoading(true);

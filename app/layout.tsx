@@ -5,6 +5,10 @@ import { Navigation } from "@/components/Navigation";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { OfflineBanner } from "@/components/OfflineBanner";
+import { ServiceUnavailableBanner } from "@/components/ServiceUnavailableBanner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,25 +25,38 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <Navigation />
-            <main className="min-h-screen">
-              {children}
-            </main>
-            <Toaster
-              position="top-right"
-              richColors
-              closeButton
-              expand={false}
-            />
-          </AuthProvider>
-        </ThemeProvider>
+        {/* Loads only when NEXT_PUBLIC_GA_ID is set */}
+        <GoogleAnalytics />
+        {/* Outer boundary: catches crashes in ThemeProvider / AuthProvider itself */}
+        <ErrorBoundary>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <AuthProvider>
+              {/* Top banner: shown when the backend is unreachable at startup */}
+              <ServiceUnavailableBanner />
+              <Navigation />
+              {/* Inner boundary: a page crash keeps the nav bar alive */}
+              <ErrorBoundary>
+                <main className="min-h-screen">
+                  {children}
+                </main>
+              </ErrorBoundary>
+              <Toaster
+                position="top-right"
+                richColors
+                closeButton
+                expand={false}
+              />
+              {/* Fixed-bottom banner — rendered outside the page error boundary
+                  so it stays visible even if the main content crashes */}
+              <OfflineBanner />
+            </AuthProvider>
+          </ThemeProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

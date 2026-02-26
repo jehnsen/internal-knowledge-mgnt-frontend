@@ -45,6 +45,9 @@ export default function Dashboard() {
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedDocument[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [displayedResults, setDisplayedResults] = useState<SearchResult[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   // Load search history and recently viewed from localStorage
   useEffect(() => {
@@ -52,21 +55,24 @@ export default function Dashboard() {
     setRecentlyViewed(getRecentlyViewed());
   }, []);
 
-  // Load recent documents on mount
+  // Load recent documents once the user is authenticated.
+  // Waiting for `user` ensures _accessToken is set before we call the backend
+  // directly, avoiding a race-condition 401 on page load.
   useEffect(() => {
+    if (!user) return;
     const loadDocuments = async () => {
       try {
         const response = await DocumentAPI.getDocuments(0, 20);
-        setDocuments(response.items);
+        setDocuments(response.items ?? []);
       } catch (err) {
-        // Silently handle errors - user might not be authenticated yet
+        // Silently handle errors
         setDocuments([]);
       } finally {
         setIsLoadingDocs(false);
       }
     };
     loadDocuments();
-  }, []);
+  }, [user]);
 
   // Perform AI search
   const handleSearch = async (e?: React.FormEvent, queryOverride?: string) => {
@@ -78,14 +84,15 @@ export default function Dashboard() {
     setSearchQuery(query);
     setShowHistory(false);
 
+    setSearchError(null);
     try {
       const response = await SearchAPI.search({
         query,
         generate_answer: true,
         limit: 10,
       });
-      console.log('Hybrid search response:', response);
       setSearchResults(response);
+      setDisplayedResults(response.results || []);
 
       // Add to search history
       addToSearchHistory(query, response.total_results || 0);
@@ -94,9 +101,28 @@ export default function Dashboard() {
       // Log audit event
       await AuditLog.search(query, response.total_results || 0);
     } catch (err) {
-      console.error('Search failed:', err);
+      setSearchError(err instanceof Error ? err.message : 'Search failed. Please try again.');
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  /** Load the next page of results without re-generating the AI answer. */
+  const handleLoadMore = async () => {
+    if (!searchQuery.trim() || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const response = await SearchAPI.search({
+        query: searchQuery,
+        limit: 10,
+        skip: displayedResults.length,
+        generate_answer: false,
+      });
+      setDisplayedResults(prev => [...prev, ...(response.results || [])]);
+    } catch (err) {
+      console.error('Load more failed:', err);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -309,6 +335,13 @@ export default function Dashboard() {
         </section>
 
         <div className="container mx-auto px-4 py-8">
+          {/* Search error */}
+          {searchError && (
+            <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+              {searchError}
+            </div>
+          )}
+
           {/* Search Results */}
           {searchResults && (
             <div className="mb-12 animate-fade-in">
@@ -402,6 +435,96 @@ export default function Dashboard() {
                     )}
                   </CardContent>
                 </Card>
+              )}
+
+              {/* Search result cards */}
+              {!isKnowledgeGap(searchResults) && displayedResults.length > 0 && (
+                <div className="mb-8 animate-fade-in">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      Search Results
+                    </h2>
+                    <span className="text-sm text-muted-foreground">
+                      Showing {displayedResults.length}
+                      {searchResults && searchResults.total_results > 0 && ` of ${searchResults.total_results}`}
+                    </span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {displayedResults.map((result, idx) => (
+                      <Card
+                        key={`${result.document_id}-${idx}`}
+                        className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 border-l-blue-400"
+                        onClick={() => handleDocumentView({
+                          id: result.document_id,
+                          title: result.title,
+                          content: result.content,
+                          created_at: result.created_at,
+                          category: result.category,
+                          tags: result.tags,
+                          file_type: result.file_type,
+                        }, result)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <h3 className="font-semibold text-sm">{result.title}</h3>
+                                {result.file_type && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    {result.file_type.toUpperCase()}
+                                  </Badge>
+                                )}
+                                {result.category && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {result.category}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {result.summary || result.content?.substring(0, 200)}
+                              </p>
+                            </div>
+                            <Badge className={`flex-shrink-0 ${
+                              result.relevance_score >= 0.7
+                                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                                : result.relevance_score >= 0.4
+                                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                            }`}>
+                              {Math.round(result.relevance_score * 100)}%
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Load more */}
+                  {searchResults && displayedResults.length < searchResults.total_results && (
+                    <div className="flex flex-col items-center gap-1 mt-4">
+                      <Button
+                        variant="outline"
+                        onClick={handleLoadMore}
+                        disabled={isLoadingMore}
+                        className="gap-2"
+                      >
+                        {isLoadingMore ? (
+                          <>
+                            <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                            Loading…
+                          </>
+                        ) : (
+                          <>Load more results</>
+                        )}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        {searchResults.total_results - displayedResults.length} more available
+                      </span>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Knowledge Gap Alert or No results message */}

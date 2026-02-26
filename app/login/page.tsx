@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { BookOpen, Loader2 } from "lucide-react";
+import { BookOpen, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,14 +14,29 @@ import { useAuth } from "@/contexts/AuthContext";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authIsLoading } = useAuth();
   const [formData, setFormData] = useState({
-    username: "tony",
-    password: "ironman",
+    username: "alice.chen",
+    password: "Test1234!",
   });
   const [error, setError] = useState("");
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Redirect once the auth context confirms the user is authenticated.
+  // This handles both a successful login and navigating to /login while already
+  // signed in.  We wait until authIsLoading is false so we never redirect
+  // before the startup session check has completed.
+  useEffect(() => {
+    if (!authIsLoading && isAuthenticated) {
+      const raw = searchParams.get('callbackUrl') || '/search';
+      // Only allow relative paths to prevent open-redirect attacks.
+      // A valid relative path starts with '/' but NOT '//' (protocol-relative URL).
+      const callbackUrl = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/search';
+      router.replace(callbackUrl);
+    }
+  }, [isAuthenticated, authIsLoading, router, searchParams]);
 
   // Check if user was redirected due to session expiration
   useEffect(() => {
@@ -37,10 +52,8 @@ function LoginForm() {
 
     try {
       await login(formData.username, formData.password);
-      // Small delay to ensure auth state updates
-      setTimeout(() => {
-        router.replace("/search");
-      }, 100);
+      // Navigation is handled reactively by the useEffect watching isAuthenticated.
+      // Keep the spinner visible (do not reset isLoading) until the redirect fires.
     } catch (err: any) {
       setError(err.message || "Failed to login. Please check your credentials.");
       setIsLoading(false);
@@ -106,17 +119,38 @@ function LoginForm() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-                disabled={isLoading}
-              />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-primary hover:underline"
+                  tabIndex={-1}
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="Enter your password"
+                  required
+                  disabled={isLoading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  disabled={isLoading}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" disabled={isLoading}>

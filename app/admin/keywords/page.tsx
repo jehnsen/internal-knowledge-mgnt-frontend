@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AnalyticsAPI } from "@/lib/api";
 import { LoadingState } from "@/components/LoadingState";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface QueryItem {
   query: string;
@@ -14,12 +15,14 @@ interface QueryItem {
 }
 
 export default function KeywordsPage() {
+  const { user } = useAuth();
   const [queries, setQueries] = useState<QueryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     loadKeywords();
-  }, []);
+  }, [user]);
 
   const loadKeywords = async () => {
     setIsLoading(true);

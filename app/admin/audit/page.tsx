@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { AuditAPI, GDPRAPI, AuditLog as AuditLogType } from "@/lib/api";
 import { AuditLog } from "@/lib/audit";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AuditLogsPage() {
+  const { user } = useAuth();
   const [auditLogs, setAuditLogs] = useState<AuditLogType[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<AuditLogType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -18,8 +20,9 @@ export default function AuditLogsPage() {
   const [filterAction, setFilterAction] = useState<string>("all");
 
   useEffect(() => {
+    if (!user) return;
     loadAuditLogs();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     filterLogs();

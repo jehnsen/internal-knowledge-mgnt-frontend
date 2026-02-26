@@ -8,70 +8,34 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ConversationalChat } from "@/components/ConversationalChat";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { DocumentList } from "@/components/DocumentList";
+import { DocumentModal } from "@/components/DocumentModal";
+import { Pagination } from "@/components/Pagination";
 import { LoadingState } from "@/components/LoadingState";
 import { Document as APIDocument, DocumentAPI } from "@/lib/api";
 import { Document as UIDocument } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { canUploadDocuments, canDeleteDocuments, canAccessChat } from "@/lib/rbac";
 
-type Tab = 'chat' | 'upload' | 'documents';
+const PAGE_SIZE = 10;
 
-// Fallback mock data for offline mode
-const mockDocuments: UIDocument[] = [
-  {
-    id: '1',
-    filename: 'Remote_Work_Policy_2024.pdf',
-    fileType: 'application/pdf',
-    fileSize: 1024000,
-    uploadedAt: new Date('2024-01-15'),
-    uploadedBy: 'Sarah Chen',
-    status: 'indexed',
-    pageCount: 12,
-    description: 'Company remote work policies and guidelines',
-  },
-  {
-    id: '2',
-    filename: 'Employee_Handbook_2024.pdf',
-    fileType: 'application/pdf',
-    fileSize: 2048000,
-    uploadedAt: new Date('2024-01-10'),
-    uploadedBy: 'Michael Rodriguez',
-    status: 'indexed',
-    pageCount: 45,
-    description: 'Complete employee handbook with all company policies',
-  },
-  {
-    id: '3',
-    filename: 'Product_Roadmap_Q1_2024.pptx',
-    fileType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-    fileSize: 3072000,
-    uploadedAt: new Date('2024-01-12'),
-    uploadedBy: 'Emily Watson',
-    status: 'processing',
-    pageCount: 28,
-  },
-  {
-    id: '4',
-    filename: 'API_Documentation.docx',
-    fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    fileSize: 512000,
-    uploadedAt: new Date('2024-01-18'),
-    uploadedBy: 'David Park',
-    status: 'indexed',
-    pageCount: 67,
-    description: 'Complete API documentation and integration guides',
-  },
-];
+type Tab = 'chat' | 'upload' | 'documents';
 
 export default function KnowledgePage() {
   const { user } = useAuth();
   const userRole = user?.role as 'guest' | 'employee' | 'admin' | undefined;
 
   const [activeTab, setActiveTab] = useState<Tab>('chat');
-  const [documents, setDocuments] = useState<UIDocument[]>([]);
+
+  // Document list state
+  const [apiDocuments, setApiDocuments] = useState<APIDocument[]>([]);  // raw API docs (needed for viewer)
+  const [documents, setDocuments] = useState<UIDocument[]>([]);          // converted for DocumentList
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalDocuments, setTotalDocuments] = useState(0);
+
+  // Document viewer state
+  const [selectedViewDoc, setSelectedViewDoc] = useState<APIDocument | null>(null);
 
   const convertAPIDocToUI = (apiDoc: APIDocument): UIDocument => ({
     id: apiDoc.id.toString(),
@@ -84,65 +48,98 @@ export default function KnowledgePage() {
     description: apiDoc.metadata?.description as string | undefined,
   });
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (page = 1) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await DocumentAPI.getDocuments(0, 100);
+      const skip = (page - 1) * PAGE_SIZE;
+      const response = await DocumentAPI.getDocuments(skip, PAGE_SIZE);
       if (response && response.items && Array.isArray(response.items)) {
+        setApiDocuments(response.items);
         setDocuments(response.items.map(convertAPIDocToUI));
+        setTotalDocuments(response.total ?? response.items.length);
+        setCurrentPage(page);
       } else {
-        // No documents or invalid response
+        setApiDocuments([]);
         setDocuments([]);
+        setTotalDocuments(0);
       }
     } catch (err: any) {
       console.error('Failed to fetch documents:', err);
       setError(err.message || 'Failed to load documents');
-      // Fallback to empty array instead of mock data for real app
+      setApiDocuments([]);
       setDocuments([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Wait for user to be set before fetching so _accessToken is available.
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    if (!user) return;
+    fetchDocuments(1);
+  }, [user]);
 
   const handleDeleteDocument = async (documentId: string) => {
     try {
       await DocumentAPI.deleteDocument(Number(documentId));
-      setDocuments(prev => prev.filter(d => d.id !== documentId));
+      // Re-fetch the current page (item count changed, page may become empty)
+      fetchDocuments(currentPage);
     } catch (err: any) {
       console.error('Failed to delete document:', err);
       setError(err.message || 'Failed to delete document');
     }
   };
 
-  const handleViewDocument = (document: UIDocument) => {
-    console.log('View document:', document);
-    // In a real app, this would open a document viewer
+  const handleViewDocument = (uiDoc: UIDocument) => {
+    const apiDoc = apiDocuments.find(d => d.id === parseInt(uiDoc.id));
+    if (apiDoc) setSelectedViewDoc(apiDoc);
   };
 
   const handleUploadComplete = () => {
-    // Refresh document list after upload
-    fetchDocuments();
+    // Refresh document list after upload; return to page 1 since new item is likely at the top
+    fetchDocuments(1);
   };
 
   // Filter tabs based on user permissions
   const allTabs = [
     { id: 'chat' as Tab, label: 'Ask Questions', icon: MessageSquare, permission: () => canAccessChat(userRole) },
     { id: 'upload' as Tab, label: 'Upload Documents', icon: Upload, permission: () => canUploadDocuments(userRole) },
-    { id: 'documents' as Tab, label: 'Document Library', icon: Library, permission: () => true }, // Everyone can view
+    { id: 'documents' as Tab, label: 'Document Library', icon: Library, permission: () => true },
   ];
 
   const tabs = allTabs.filter(tab => tab.permission());
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/20 to-blue-50/30">
-     
+
+      {/* Tab navigation */}
+      <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4">
+          <div className="flex gap-1 py-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Tab Content */}
-      <div className="min-h-[600px]">
+      <div className="container mx-auto px-4 py-6 min-h-[600px]">
         {activeTab === 'chat' && (
           <Card className="h-[700px] flex flex-col overflow-hidden">
             <CardHeader className="border-b">
@@ -181,26 +178,58 @@ export default function KnowledgePage() {
                     Manage your uploaded documents and their indexing status
                   </CardDescription>
                 </div>
-                <Button onClick={fetchDocuments} variant="outline" size="sm">
+                <Button onClick={() => fetchDocuments(currentPage)} variant="outline" size="sm">
                   Refresh
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
               {isLoading ? (
                 <LoadingState message="Loading documents..." />
               ) : (
-                <DocumentList
-                  documents={documents}
-                  onDelete={canDeleteDocuments(userRole) ? handleDeleteDocument : undefined}
-                  onView={handleViewDocument}
-                />
+                <>
+                  <DocumentList
+                    documents={documents}
+                    onDelete={canDeleteDocuments(userRole) ? handleDeleteDocument : undefined}
+                    onView={handleViewDocument}
+                  />
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(totalDocuments / PAGE_SIZE)}
+                    onPageChange={fetchDocuments}
+                    totalItems={totalDocuments}
+                    pageSize={PAGE_SIZE}
+                    className="mt-2"
+                  />
+                </>
               )}
             </CardContent>
           </Card>
         )}
-      </div>
-      </div>
+      </div> {/* tab content container */}
 
+      {/* Document viewer — outside the tab card so it isn't unmounted on tab switch */}
+      {selectedViewDoc && (
+        <DocumentModal
+          isOpen={true}
+          onClose={() => setSelectedViewDoc(null)}
+          document={{
+            id: selectedViewDoc!.id,
+            title: selectedViewDoc!.title,
+            content: selectedViewDoc!.content,
+            created_at: selectedViewDoc!.created_at,
+            file_type: selectedViewDoc!.file_type,
+            file_path: selectedViewDoc!.file_path,
+            metadata: selectedViewDoc!.metadata,
+          }}
+        />
+      )}
+    </div>
   );
 }

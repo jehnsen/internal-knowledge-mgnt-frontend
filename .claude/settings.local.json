@@ -12,7 +12,9 @@
       "Bash(cat:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(npm run test:run)",
+      "Bash(node -e \"const s = require\\(''@sentry/nextjs''\\); console.log\\(Object.keys\\(s\\).filter\\(k => k.toLowerCase\\(\\).includes\\(''register''\\) || k.toLowerCase\\(\\).includes\\(''init''\\)\\)\\)\")"
     ],
     "deny": [],
     "ask": []

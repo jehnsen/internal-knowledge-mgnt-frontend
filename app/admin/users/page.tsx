@@ -10,8 +10,10 @@ import { Label } from "@/components/ui/label";
 import { GDPRAPI, AuthAPI, User, UserActivityData, RegisterRequest } from "@/lib/api";
 import { AuditLog } from "@/lib/audit";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function UsersPage() {
+  const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -26,8 +28,9 @@ export default function UsersPage() {
   });
 
   useEffect(() => {
+    if (!user) return;
     loadUsers();
-  }, []);
+  }, [user]);
 
   const loadUsers = async () => {
     try {
