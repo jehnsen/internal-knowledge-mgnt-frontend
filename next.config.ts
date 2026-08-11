@@ -12,6 +12,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 // inline hydration bootstrap.  'unsafe-eval' has been removed — Next.js 13+
 // App Router does not need it in production.  To harden further, replace
 // 'unsafe-inline' with a middleware-generated nonce (see Next.js CSP docs).
+//
+// NOTE: frame-src allows blob: so the PDF preview can render.  The document is
+// fetched with the Bearer token and handed to the iframe as an object URL, and
+// without blob: it falls back to default-src 'self' and is refused.
+// frame-ancestors is 'self' rather than 'none' for the same feature: a blob:
+// document inherits the creating page's CSP, so 'none' would make the PDF
+// refuse to be framed by our own page.  Cross-origin framing — the actual
+// clickjacking risk — is still blocked.
 // ---------------------------------------------------------------------------
 const apiOrigin = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
@@ -27,7 +35,8 @@ const ContentSecurityPolicy = `
     https://analytics.google.com
     https://region1.google-analytics.com
     https://*.ingest.sentry.io;
-  frame-ancestors 'none';
+  frame-src 'self' blob:;
+  frame-ancestors 'self';
   base-uri 'self';
   form-action 'self';
   object-src 'none';
@@ -36,8 +45,10 @@ const ContentSecurityPolicy = `
   .trim();
 
 const securityHeaders = [
-  // Prevent the app from being embedded in an iframe (clickjacking)
-  { key: "X-Frame-Options", value: "DENY" },
+  // Prevent cross-origin embedding (clickjacking).  SAMEORIGIN rather than DENY
+  // to match frame-ancestors 'self' above — legacy fallback for browsers that
+  // don't support frame-ancestors.
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   // Prevent MIME-type sniffing
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Enforce HTTPS for 2 years; include subdomains

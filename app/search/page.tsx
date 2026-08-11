@@ -19,15 +19,94 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { DocumentAPI, SearchAPI, Document as APIDocument, SearchResponse, SearchResult } from "@/lib/api";
+import { DocumentAPI, SearchAPI, Document as APIDocument, SearchResponse, SearchResult, SourceDocument } from "@/lib/api";
 import { AuditLog } from "@/lib/audit";
-import { Citation } from "@/lib/types";
 import { DocumentModal } from "@/components/DocumentModal";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { KnowledgeGapAlert } from "@/components/KnowledgeGapAlert";
 import { useAuth } from "@/contexts/AuthContext";
 import { canUploadDocuments, canAccessChat } from "@/lib/rbac";
 import { addToSearchHistory, getSearchHistory, removeFromSearchHistory, addToRecentlyViewed, getRecentlyViewed, SearchHistoryItem, RecentlyViewedDocument } from "@/lib/storage";
+
+/**
+ * One citation row: what the passage says and exactly where it lives, so the
+ * answer can be checked against the source without reading the whole document.
+ */
+function EvidenceRow({
+  source,
+  onOpen,
+}: {
+  source: SourceDocument;
+  onOpen: (source: SourceDocument) => void;
+}) {
+  const score = Math.round(source.relevance_score * 100);
+  const scoreClass =
+    score >= 70
+      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+      : score >= 40
+        ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(source)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen(source);
+        }
+      }}
+      className="p-3 rounded-lg bg-muted/50 hover:bg-muted hover:shadow-md transition-all cursor-pointer group text-left"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {source.citation_id && (
+              <Badge variant="outline" className="text-[10px] font-mono flex-shrink-0">
+                [{source.citation_id}]
+              </Badge>
+            )}
+            <p className="text-xs font-bold text-foreground group-hover:text-blue-600 transition-colors truncate">
+              {source.title}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            {source.locator ? (
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                {source.locator}
+              </span>
+            ) : (
+              <span className="text-xs italic text-muted-foreground">
+                Exact location unavailable
+              </span>
+            )}
+            {source.match_level === 'document' && (
+              <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-500/50">
+                whole-document match
+              </Badge>
+            )}
+            {source.verified && (
+              <Badge variant="outline" className="text-[10px] text-green-700 border-green-500/50">
+                verified
+              </Badge>
+            )}
+          </div>
+
+          {source.excerpt && (
+            <p className="text-xs text-muted-foreground mt-2 line-clamp-3 border-l-2 border-blue-500/40 pl-2 italic">
+              {source.excerpt}
+            </p>
+          )}
+        </div>
+
+        <Badge className={`flex-shrink-0 ${scoreClass}`}>{score}%</Badge>
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -41,6 +120,7 @@ export default function Dashboard() {
   const [selectedDocument, setSelectedDocument] = useState<{
     doc: any;
     result?: SearchResult;
+    source?: SourceDocument;
   } | null>(null);
   const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedDocument[]>([]);
@@ -126,8 +206,8 @@ export default function Dashboard() {
     }
   };
 
-  const handleDocumentView = (doc: any, result?: SearchResult) => {
-    setSelectedDocument({ doc, result });
+  const handleDocumentView = (doc: any, result?: SearchResult, source?: SourceDocument) => {
+    setSelectedDocument({ doc, result, source });
 
     // Add to recently viewed
     if (doc.id && doc.title) {
@@ -146,16 +226,61 @@ export default function Dashboard() {
     }
   };
 
-  // Convert source_documents to citations for display
-  const citations: Citation[] = searchResults?.source_documents
-    ? searchResults.source_documents.map((source, index) => ({
-        documentId: source.document_id,
-        documentName: source.title,
-        chunkId: `chunk_${source.document_id}_${source.chunk_index ?? index}`,
-        content: source.filename, // Show filename as preview
-        relevanceScore: source.relevance_score,
-      }))
-    : [];
+  // Cited passages are the evidence the answer actually rests on; the rest were
+  // retrieved as supporting context and are listed separately.
+  const sources: SourceDocument[] = searchResults?.source_documents ?? [];
+  const citedSources = sources.filter(source => source.cited);
+  const supportingSources = sources.filter(source => !source.cited);
+
+  // GET /documents/{id} nests the file details under `doc_metadata`, while the
+  // modal reads a flat `file_type`. Without flattening it the modal never takes
+  // its PDF branch, so a citation cannot be opened at its page.
+  const toModalDocument = (document: any, source: SourceDocument) => {
+    const metadata = document?.doc_metadata ?? document?.metadata ?? {};
+    return {
+      id: document?.id ?? source.document_id,
+      title: document?.title ?? source.title,
+      content: document?.content ?? '',
+      created_at: document?.created_at,
+      updated_at: document?.updated_at,
+      category: document?.category ?? source.category,
+      tags: document?.tags,
+      file_type: metadata.file_type ?? document?.file_type ?? source.file_type,
+      file_path: metadata.filename ?? source.filename,
+      has_original_file: document?.has_original_file ?? false,
+      metadata,
+    };
+  };
+
+  // Open a citation at its passage. Search results only carry a 500-character
+  // snippet, so fetch the document to show the passage in its real context.
+  const openSourceEvidence = async (source: SourceDocument) => {
+    const fromResults = searchResults?.results?.find(
+      r => r.document_id === source.document_id
+    );
+
+    try {
+      const document = await DocumentAPI.getDocument(source.document_id);
+      handleDocumentView(toModalDocument(document, source), fromResults || undefined, source);
+    } catch (err) {
+      console.error('Could not load full document, falling back to snippet:', err);
+      handleDocumentView(
+        toModalDocument(
+          {
+            id: source.document_id,
+            title: source.title,
+            content: fromResults?.content ?? source.excerpt ?? '',
+            created_at: fromResults?.created_at,
+            category: fromResults?.category ?? source.category,
+            file_type: fromResults?.file_type ?? source.file_type,
+          },
+          source
+        ),
+        fromResults || undefined,
+        source
+      );
+    }
+  };
 
   const [showUpload, setShowUpload] = useState(false);
 
@@ -359,11 +484,11 @@ export default function Dashboard() {
                           <CardDescription>Powered by {searchResults.search_method} search • {searchResults.execution_time.toFixed(2)}s</CardDescription>
                         </div>
                       </div>
-                      <Badge className={citations.length === 0
+                      <Badge className={citedSources.length === 0
                         ? "bg-gradient-to-r from-red-500 to-orange-500 text-white"
                         : "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
                       }>
-                        {citations.length} Source{citations.length !== 1 ? 's' : ''}
+                        {citedSources.length} Cited Source{citedSources.length !== 1 ? 's' : ''}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -380,58 +505,40 @@ export default function Dashboard() {
                         );
                       })}
                     </div>
-                    {citations.length > 0 && (
+                    {citedSources.length > 0 && (
                       <div className="border-t pt-4 mt-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-semibold flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-blue-600" />
-                            Source Documents (sorted by relevance)
-                          </p>
-                        </div>
+                        <p className="text-sm font-semibold flex items-center gap-2 mb-3">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          Evidence for this answer
+                        </p>
                         <div className="grid gap-2">
-                          {citations.map((citation, idx) => {
-                            // Find the full document from results array
-                            const fullDocument = !isKnowledgeGap(searchResults) && searchResults.results?.find(r => r.document_id === citation.documentId);
-
-                            return (
-                              <div
-                                key={idx}
-                                className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted hover:shadow-md transition-all cursor-pointer group"
-                                onClick={() => {
-                                  if (fullDocument) {
-                                    handleDocumentView({
-                                      id: fullDocument.document_id,
-                                      title: fullDocument.title,
-                                      content: fullDocument.content,
-                                      created_at: fullDocument.created_at,
-                                      category: fullDocument.category,
-                                      tags: fullDocument.tags,
-                                      file_type: fullDocument.file_type,
-                                    }, fullDocument);
-                                  }
-                                }}
-                              >
-                                <div className="flex items-center gap-3 flex-1 min-w-0">
-                                  <div className="flex-1 overflow-hidden">
-                                    <p className="text-xs italic font-bold text-muted-foreground group-hover:text-blue-600 transition-colors">
-                                      (Source: {citation.documentName})
-                                    </p>
-                                  </div>
-                                </div>
-                                <Badge className={`flex-shrink-0 ${
-                                  citation.relevanceScore >= 0.7 ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white' : ''
-                                }${
-                                  citation.relevanceScore >= 0.4 && citation.relevanceScore < 0.7 ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : ''
-                                }${
-                                  citation.relevanceScore < 0.4 ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white' : ''
-                                }`}>
-                                  {Math.round(citation.relevanceScore * 100)}%
-                                </Badge>
-                              </div>
-                            );
-                          })}
+                          {citedSources.map((source, idx) => (
+                            <EvidenceRow
+                              key={source.citation_id ?? idx}
+                              source={source}
+                              onOpen={openSourceEvidence}
+                            />
+                          ))}
                         </div>
                       </div>
+                    )}
+
+                    {supportingSources.length > 0 && (
+                      <details className="border-t pt-4 mt-4 group">
+                        <summary className="text-sm font-semibold flex items-center gap-2 cursor-pointer list-none">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          {supportingSources.length} more passage{supportingSources.length !== 1 ? 's' : ''} retrieved but not cited
+                        </summary>
+                        <div className="grid gap-2 mt-3">
+                          {supportingSources.map((source, idx) => (
+                            <EvidenceRow
+                              key={source.citation_id ?? `supporting-${idx}`}
+                              source={source}
+                              onOpen={openSourceEvidence}
+                            />
+                          ))}
+                        </div>
+                      </details>
                     )}
                   </CardContent>
                 </Card>
@@ -709,6 +816,7 @@ export default function Dashboard() {
             onClose={() => setSelectedDocument(null)}
             document={selectedDocument.doc}
             result={selectedDocument.result}
+            citation={selectedDocument.source}
             searchQuery={searchQuery}
           />
         )}

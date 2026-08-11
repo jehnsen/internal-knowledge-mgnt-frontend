@@ -18,7 +18,11 @@ export interface Document {
   file_path?: string;
   file_type?: string;
   file_size?: number;
+  /** File details as returned by the API — filename, file_type, file_size. */
+  doc_metadata?: Record<string, any>;
   metadata?: Record<string, any>;
+  /** True when the original upload can be fetched from /documents/{id}/download. */
+  has_original_file?: boolean;
   user_id: number;
   created_at: string;
   updated_at: string;

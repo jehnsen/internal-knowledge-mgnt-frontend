@@ -97,11 +97,11 @@ export function jsonHeaders(): HeadersInit {
 /** Parses an API response, throws a descriptive Error on failure. */
 export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      const message = response.status === 401
-        ? 'Your session has expired. Please log in again.'
-        : 'Authentication failed. Please log in again.';
-
+    // 401 means the token itself is missing/invalid/expired — the session is
+    // genuinely gone, so log the user out. 403 means the token is valid but
+    // the user lacks permission for this specific resource (e.g. a non-admin
+    // hitting an admin-only endpoint) — that must NOT log the user out.
+    if (response.status === 401) {
       // Only signal expiry when we actually had a token stored.
       // If _accessToken is null the request raced ahead of session-init;
       // ProtectedRoute will handle any redirect that is needed.
@@ -113,7 +113,16 @@ export async function handleResponse<T>(response: Response): Promise<T> {
           window.dispatchEvent(new CustomEvent('auth:sessionExpired'));
         }
       }
-      throw new Error(message);
+      throw new Error('Your session has expired. Please log in again.');
+    }
+
+    if (response.status === 403) {
+      let detail = 'You do not have permission to perform this action.';
+      try {
+        const error = await response.json();
+        detail = error.detail || error.message || detail;
+      } catch { /* fall back to default message */ }
+      throw new Error(detail);
     }
 
     let errorDetail = 'An error occurred';

@@ -11,6 +11,7 @@ import { GDPRAPI, AuthAPI, User, UserActivityData, RegisterRequest } from "@/lib
 import { AuditLog } from "@/lib/audit";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { RequireAdmin } from "@/components/RequireAdmin";
 
 export default function UsersPage() {
   const { user } = useAuth();
@@ -28,7 +29,7 @@ export default function UsersPage() {
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role !== "admin") return;
     loadUsers();
   }, [user]);
 
@@ -132,6 +133,7 @@ export default function UsersPage() {
   };
 
   return (
+    <RequireAdmin>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -428,5 +430,6 @@ export default function UsersPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RequireAdmin>
   );
 }

@@ -4,15 +4,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { BarChart3, FileText, Users, Tag, FileWarning, Shield, Key, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/contexts/AuthContext";
 
 const sidebarItems = [
-  { id: "analytics", label: "Analytics", icon: BarChart3, path: "/admin/analytics" },
-  { id: "documents", label: "Documents", icon: FileText, path: "/admin/documents" },
-  { id: "users", label: "Users", icon: Users, path: "/admin/users" },
-  { id: "keywords", label: "Keywords", icon: Tag, path: "/admin/keywords" },
-  { id: "gaps", label: "Knowledge Gaps", icon: FileWarning, path: "/admin/gaps" },
-  { id: "audit", label: "Audit Logs", icon: Shield, path: "/admin/audit" },
-  { id: "gdpr", label: "GDPR & Privacy", icon: Key, path: "/admin/gdpr" },
+  { id: "analytics", label: "Analytics", icon: BarChart3, path: "/admin/analytics", adminOnly: false },
+  { id: "documents", label: "Documents", icon: FileText, path: "/admin/documents", adminOnly: false },
+  { id: "users", label: "Users", icon: Users, path: "/admin/users", adminOnly: true },
+  { id: "keywords", label: "Keywords", icon: Tag, path: "/admin/keywords", adminOnly: false },
+  { id: "gaps", label: "Knowledge Gaps", icon: FileWarning, path: "/admin/gaps", adminOnly: false },
+  { id: "audit", label: "Audit Logs", icon: Shield, path: "/admin/audit", adminOnly: true },
+  { id: "gdpr", label: "GDPR & Privacy", icon: Key, path: "/admin/gdpr", adminOnly: true },
 ];
 
 interface AdminSidebarProps {
@@ -22,6 +23,8 @@ interface AdminSidebarProps {
 export function AdminSidebar({ onRefresh }: AdminSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useAuth();
+  const visibleItems = sidebarItems.filter((item) => !item.adminOnly || user?.role === "admin");
 
   return (
     <aside className="w-64 min-h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0">
@@ -34,7 +37,7 @@ export function AdminSidebar({ onRefresh }: AdminSidebarProps) {
         </p> */}
 
         <nav className="space-y-1">
-          {sidebarItems.map((item) => {
+          {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
 

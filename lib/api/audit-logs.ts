@@ -22,7 +22,7 @@ export class AuditAPI {
   ): Promise<PaginatedResponse<AuditLog> | AuditLog[]> {
     const params = new URLSearchParams({ skip: skip.toString(), limit: limit.toString() });
     if (userId) params.append('user_id', userId.toString());
-    const response = await fetchWithRetry(`${BFF_BASE}/audit/log?${params}`);
+    const response = await fetchWithRetry(`${BFF_BASE}/audit/logs?${params}`);
     return handleResponse<PaginatedResponse<AuditLog> | AuditLog[]>(response);
   }
 

@@ -11,6 +11,7 @@ import { DocumentAPI, GDPRAPI, AuditAPI, User, AuditLog as AuditLogType } from "
 import { AuditLog } from "@/lib/audit";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { RequireAdmin } from "@/components/RequireAdmin";
 
 export default function GDPRPage() {
   const { user } = useAuth();
@@ -32,7 +33,7 @@ export default function GDPRPage() {
   const [deleteSearchHistory, setDeleteSearchHistory] = useState(true);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role !== "admin") return;
     loadData();
   }, [user]);
 
@@ -166,6 +167,7 @@ export default function GDPRPage() {
   };
 
   return (
+    <RequireAdmin>
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">GDPR & Data Privacy</h1>
@@ -564,5 +566,6 @@ export default function GDPRPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RequireAdmin>
   );
 }
