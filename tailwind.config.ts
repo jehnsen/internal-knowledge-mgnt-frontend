@@ -86,6 +86,29 @@ const config: Config = {
           from: { transform: "scale(0.95)", opacity: "0" },
           to: { transform: "scale(1)", opacity: "1" },
         },
+        // Slow drifting colour field behind the auth screens.
+        aurora: {
+          "0%, 100%": { transform: "translate3d(0, 0, 0) scale(1)" },
+          "33%": { transform: "translate3d(6%, -8%, 0) scale(1.15)" },
+          "66%": { transform: "translate3d(-5%, 6%, 0) scale(0.92)" },
+        },
+        // Rotating conic sheen used for the card's glow border.
+        "spin-slow": {
+          to: { transform: "rotate(360deg)" },
+        },
+        // Neural-graph nodes breathing in and out of focus.
+        "pulse-node": {
+          "0%, 100%": { opacity: "0.2", transform: "scale(1)" },
+          "50%": { opacity: "1", transform: "scale(1.7)" },
+        },
+        // Signal travelling along a graph edge.
+        "dash-flow": {
+          to: { strokeDashoffset: "-32" },
+        },
+        "glow-breathe": {
+          "0%, 100%": { opacity: "0.35" },
+          "50%": { opacity: "0.75" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -97,6 +120,12 @@ const config: Config = {
         "slide-in-from-left": "slide-in-from-left 0.3s ease-out",
         "slide-in-from-right": "slide-in-from-right 0.3s ease-out",
         "zoom-in": "zoom-in 0.2s ease-out",
+        aurora: "aurora 24s ease-in-out infinite",
+        "aurora-slow": "aurora 34s ease-in-out infinite reverse",
+        "spin-slow": "spin-slow 14s linear infinite",
+        "pulse-node": "pulse-node 4s ease-in-out infinite",
+        "dash-flow": "dash-flow 3s linear infinite",
+        "glow-breathe": "glow-breathe 7s ease-in-out infinite",
       },
     },
   },

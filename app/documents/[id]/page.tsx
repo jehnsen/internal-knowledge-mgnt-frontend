@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, FileText, User, Calendar, BarChart3, File } from "lucide-react";
+import { ArrowLeft, Download, FileText, User, Calendar, BarChart3, File, AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,8 +17,13 @@ export default function DocumentPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Bumped by the Retry button to re-run the loader.
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     const loadDocument = async () => {
+      setIsLoading(true);
+      setError("");
       try {
         const id = Number(params.id);
         const doc = await DocumentAPI.getDocument(id);
@@ -33,7 +38,7 @@ export default function DocumentPage() {
     if (params.id) {
       loadDocument();
     }
-  }, [params.id]);
+  }, [params.id, attempt]);
 
   if (isLoading) {
     return (
@@ -46,21 +51,38 @@ export default function DocumentPage() {
   }
 
   if (error || !document) {
+    // A failed request is not the same as a missing document — reporting a
+    // network or permission error as "not found" sends people hunting for a
+    // document that is actually right there.
     return (
       <ProtectedRoute>
         <div className="min-h-screen flex items-center justify-center p-4">
           <Card className="max-w-md w-full">
             <CardContent className="pt-6">
               <div className="text-center">
-                <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Document Not Found</h2>
+                {error ? (
+                  <AlertTriangle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+                ) : (
+                  <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                )}
+                <h2 className="text-xl font-semibold mb-2">
+                  {error ? "Couldn't load this document" : "Document not found"}
+                </h2>
                 <p className="text-muted-foreground mb-6">
                   {error || "The document you're looking for doesn't exist."}
                 </p>
-                <Button onClick={() => router.back()}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Go Back
-                </Button>
+                <div className="flex justify-center gap-3">
+                  <Button variant="outline" onClick={() => router.back()}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Go Back
+                  </Button>
+                  {error && (
+                    <Button onClick={() => setAttempt((n) => n + 1)}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Try Again
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

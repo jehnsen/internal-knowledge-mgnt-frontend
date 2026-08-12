@@ -7,6 +7,10 @@ export type { PaginatedResponse, PaginatedUserResponse, AuditLog } from './types
 export type { User, AuthTokens, LoginRequest, RegisterRequest } from './auth';
 export { AuthAPI } from './auth';
 
+// Lets AuthProvider release requests that are waiting on the startup session
+// check when it settles without a token (logged out, or the backend is down).
+export { endSessionRestore } from './_http';
+
 export type { Document, DocumentCreate, DocumentUpdate } from './documents';
 export { DocumentAPI, KnowledgeAPI } from './documents';
 

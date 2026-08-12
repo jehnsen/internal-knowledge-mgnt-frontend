@@ -57,3 +57,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /*
+   * SVG shapes scale from their own centre rather than the SVG origin, so the
+   * neural-graph nodes in AuthBackground pulse in place instead of drifting.
+   */
+  .svg-node {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+}

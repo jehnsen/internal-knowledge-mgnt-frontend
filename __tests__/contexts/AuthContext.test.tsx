@@ -14,6 +14,8 @@ vi.mock('@/lib/api', () => ({
     logout:         vi.fn(),
     register:       vi.fn(),
   },
+  // Opens the _http session-restore gate once the startup check settles.
+  endSessionRestore: vi.fn(),
 }));
 
 vi.mock('@/lib/audit', () => ({

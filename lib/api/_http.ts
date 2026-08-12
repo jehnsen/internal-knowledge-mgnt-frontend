@@ -16,8 +16,54 @@ export const MAX_RETRIES = 2;               // 3 total attempts (initial + 2 ret
 // ---------------------------------------------------------------------------
 let _accessToken: string | null = null;
 
+// ---------------------------------------------------------------------------
+// Session-restore gate
+// ---------------------------------------------------------------------------
+// On a full page load the token is gone (it only ever lived in this module) and
+// has to be fetched back from the HttpOnly cookie via GET /api/auth/me.  React
+// runs child effects BEFORE parent effects, so a page's data-loading effect
+// fires before AuthProvider has even started that request — the call would go
+// out with no Authorization header, 401, and surface to the user as "not
+// found" on a perfectly valid resource.
+//
+// So the module starts life closed: any direct-to-backend request waits here
+// until the session has been restored (or has definitively failed).  Requests
+// to same-origin `/api/*` BFF routes never wait — they authenticate with the
+// cookie and must not, since /api/auth/me is what opens the gate.
+// ---------------------------------------------------------------------------
+const RESTORE_TIMEOUT_MS = 15_000;
+
+let _sessionRestore: Promise<void> | null = null;
+let _openGate: (() => void) | null = null;
+let _restoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+function beginSessionRestore(): void {
+  if (_sessionRestore) return;
+  _sessionRestore = new Promise<void>(resolve => { _openGate = resolve; });
+  // Safety valve: never let a failure to call endSessionRestore() hang the app.
+  _restoreTimer = setTimeout(endSessionRestore, RESTORE_TIMEOUT_MS);
+}
+
+/**
+ * Releases any requests waiting on the session restore.  Called once the
+ * startup /auth/me check has settled — on success, failure, or "not logged in"
+ * alike, since in every case waiting longer cannot help.
+ */
+export function endSessionRestore(): void {
+  if (_restoreTimer) { clearTimeout(_restoreTimer); _restoreTimer = null; }
+  _openGate?.();
+  _openGate = null;
+  _sessionRestore = null;
+}
+
+// Close the gate at module load — before any component renders, which is the
+// whole point.  Server-side there is no session to restore, so skip it.
+if (typeof window !== 'undefined') beginSessionRestore();
+
 export function setAccessToken(token: string | null): void {
   _accessToken = token;
+  // A token arriving means the restore succeeded; stop holding requests.
+  if (token) endSessionRestore();
 }
 
 export function sleep(ms: number): Promise<void> {
@@ -37,6 +83,11 @@ export async function fetchWithRetry(
   retries: number = MAX_RETRIES,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<Response> {
+  // Relative URLs are same-origin BFF routes authenticated by cookie; they
+  // need no token and must never wait (GET /api/auth/me opens the gate).
+  const isBffRoute = url.startsWith('/');
+  if (!isBffRoute && _sessionRestore) await _sessionRestore;
+
   // Inject Authorization header once, before the retry loop
   if (_accessToken) {
     const headers = new Headers(options.headers);

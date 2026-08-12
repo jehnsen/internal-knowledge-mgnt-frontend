@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { AuthAPI, User } from "@/lib/api";
+import { AuthAPI, User, endSessionRestore } from "@/lib/api";
 import { AuditLog } from "@/lib/audit";
 
 interface AuthContextType {
@@ -41,6 +41,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           err instanceof Error ? err.message : 'Service temporarily unavailable.';
         setSessionInitError(message);
       } finally {
+        // Release any data requests holding for the session, whatever the
+        // outcome. A successful restore already opened the gate via
+        // setAccessToken; this covers "logged out" and "backend unreachable",
+        // where waiting any longer cannot produce a token.
+        endSessionRestore();
         setIsLoading(false);
       }
     };
