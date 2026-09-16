@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, ExternalLink, FileText, User, Calendar, BarChart3, File, Download } from "lucide-react";
+import { X, ExternalLink, FileText, User, Calendar, BarChart3, File, Download, AlertTriangle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +68,28 @@ function highlightText(text: string, searchTerms: string[]): React.ReactNode {
     }
     return part;
   });
+}
+
+/** Render page numbers compactly, collapsing runs: "30-32, 45". */
+function formatPageList(pages: number[]): string {
+  const ordered = [...new Set(pages)].sort((a, b) => a - b);
+  if (ordered.length === 0) return '';
+
+  const groups: string[] = [];
+  let runStart = ordered[0];
+  let previous = ordered[0];
+
+  for (const page of ordered.slice(1)) {
+    if (page === previous + 1) {
+      previous = page;
+      continue;
+    }
+    groups.push(previous > runStart ? `${runStart}-${previous}` : `${runStart}`);
+    runStart = previous = page;
+  }
+  groups.push(previous > runStart ? `${runStart}-${previous}` : `${runStart}`);
+
+  return groups.join(', ');
 }
 
 // Collapse whitespace so passage text can be matched against rendered
@@ -226,6 +248,8 @@ interface DocumentModalProps {
     metadata?: Record<string, any>;
     /** False when the backend has no original file to serve for this document. */
     has_original_file?: boolean;
+    /** Pages that yielded no text at ingestion, so are not searchable. */
+    unreadable_pages?: number[];
   };
   similarityScore?: number;
   chunkContent?: string;
@@ -258,6 +282,7 @@ export function DocumentModal({
   // Documents ingested before file retention have no original to serve, so the
   // preview would only ever 404. `undefined` means the caller did not check.
   const hasOriginalFile = document.has_original_file !== false;
+  const unreadablePages = document.unreadable_pages ?? [];
   const canPreviewPdf =
     Boolean(document.id) &&
     Boolean(document.file_type?.toLowerCase().includes('pdf')) &&
@@ -392,6 +417,26 @@ export function DocumentModal({
         </DialogHeader>
 
         <Separator className="flex-shrink-0" />
+
+        {/* Pages that produced no text are absent from the searchable content,
+            so an answer drawn from this document may be missing what is on
+            them. Say so rather than letting the gap go unnoticed. */}
+        {unreadablePages.length > 0 && (
+          <div className="flex-shrink-0 mt-4 flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-50 dark:bg-amber-950/20 p-3">
+            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-semibold text-amber-800 dark:text-amber-300">
+                {unreadablePages.length} page{unreadablePages.length !== 1 ? 's' : ''} could
+                not be read as text (page{unreadablePages.length !== 1 ? 's' : ''}{' '}
+                {formatPageList(unreadablePages)})
+              </p>
+              <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                These are most likely scans or images. Their content is not searchable
+                and cannot be cited, so answers from this document may be incomplete.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Metadata Section */}
         <div className="flex-shrink-0 grid grid-cols-2 md:grid-cols-3 gap-4 py-4">

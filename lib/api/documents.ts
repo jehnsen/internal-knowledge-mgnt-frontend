@@ -23,6 +23,8 @@ export interface Document {
   metadata?: Record<string, any>;
   /** True when the original upload can be fetched from /documents/{id}/download. */
   has_original_file?: boolean;
+  /** Pages that yielded no text at ingestion, so are not searchable or citable. */
+  unreadable_pages?: number[];
   user_id: number;
   created_at: string;
   updated_at: string;

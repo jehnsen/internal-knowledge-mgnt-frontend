@@ -248,6 +248,7 @@ export default function Dashboard() {
       file_type: metadata.file_type ?? document?.file_type ?? source.file_type,
       file_path: metadata.filename ?? source.filename,
       has_original_file: document?.has_original_file ?? false,
+      unreadable_pages: document?.unreadable_pages ?? [],
       metadata,
     };
   };
