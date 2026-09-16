@@ -40,7 +40,7 @@ export function PopularQueries({ queries }: PopularQueriesProps) {
                   </Badge>
                   <p className="text-sm font-medium">{item.query}</p>
                 </div>
-                <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                <Badge className="bg-primary/10 text-primary">
                   {item.count} searches
                 </Badge>
               </div>

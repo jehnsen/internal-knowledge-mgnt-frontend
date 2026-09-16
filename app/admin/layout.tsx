@@ -10,12 +10,12 @@ export default function AdminLayout({
 }) {
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
-        <div className="flex">
+      <div className="min-h-screen bg-background">
+        <div className="flex flex-col md:flex-row">
           <AdminSidebar />
-          <main className="flex-1 p-8">
+          <div className="min-w-0 flex-1 p-4 sm:p-8">
             {children}
-          </main>
+          </div>
         </div>
       </div>
     </ProtectedRoute>

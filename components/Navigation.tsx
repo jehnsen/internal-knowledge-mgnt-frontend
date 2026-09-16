@@ -2,145 +2,64 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bot, Search, Upload, User, LogOut, Shield, BarChart3, Moon, Sun } from "lucide-react";
+import { Search, LogOut, BarChart3, Moon, Sun, Sparkles, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Brand } from "@/components/Brand";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { getRoleDisplayName, getRoleColor } from "@/lib/rbac";
+import { canAccessChat, getRoleDisplayName } from "@/lib/rbac";
 import { useTheme } from "next-themes";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
-
+  const { resolvedTheme, setTheme } = useTheme();
   const userRole = user?.role as 'guest' | 'employee' | 'admin' | undefined;
-
   const navItems = [
-    { href: "/search", label: "Search", icon: Search },
-    { href: "/chat", label: "Chat", icon: Bot },
-    { href: "/admin", label: "Dashboard", icon: BarChart3 },
+    { href: "/search", label: "Knowledge search", icon: Search },
+    { href: "/chat", label: canAccessChat(userRole) ? "AI workspace" : "Document library", icon: Sparkles },
+    { href: "/admin", label: "Management", icon: BarChart3 },
   ];
 
-  const handleLogout = () => {
-    logout();
-    router.push("/");
-  };
-
-  // Don't show navigation on landing/login/register pages
-  if (pathname === "/" || pathname === "/login" || pathname === "/register") {
-    return null;
-  }
+  if (["/", "/login", "/register", "/forgot-password", "/reset-password"].includes(pathname)) return null;
 
   return (
-    <nav className="border-b bg-gradient-to-r from-background via-background to-primary/5 backdrop-blur-sm supports-[backdrop-filter]:bg-background/95 sticky top-0 z-50 shadow-sm">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/search" className="flex items-center gap-2 group">
-              <div className="p-2 bg-gradient-to-br from-red-600 to-red-400 rounded-lg shadow-lg group-hover:shadow-xl transition-all">
-                <Bot className="h-5 w-5 text-white" />
-              </div>
-              {/* <span className="font-bold text-xl bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Knowledge Hub
-              </span> */}
-              <span className="font-bold text-xl bg-gradient-to-r from-red-600 to-red-400 bg-clip-text text-transparent">
-                Access Hire Australia
-              </span>
-            </Link>
-
-            <div className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={isActive ? "secondary" : "ghost"}
-                      className={cn(
-                        "gap-2 transition-all",
-                        isActive && "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20"
-                      )}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="rounded-full hover:bg-gradient-to-br hover:from-blue-500/10 hover:to-purple-500/10 transition-all"
-                >
-                  <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                  <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                  <span className="sr-only">Toggle theme</span>
+    <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur-xl">
+      <div className="mx-auto flex h-20 max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-8 lg:px-10">
+        <Link href="/search" aria-label="Internal Knowledge Management System home"><Brand /></Link>
+        <nav aria-label="Main navigation" className="hidden items-center gap-1 lg:flex">
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = pathname === href || pathname.startsWith(href + "/");
+            return <Link key={href} href={href} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors", active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="h-4 w-4" />{label}</Link>;
+          })}
+        </nav>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="Toggle theme" className="relative rounded-full">
+            <Sun className="h-4 w-4 dark:hidden" /><Moon className="hidden h-4 w-4 dark:block" />
+          </Button>
+          {isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-auto gap-3 border-l pl-3 sm:pl-5" aria-label="Account menu">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-primary">{(user?.full_name || user?.username || "U").split(/\s+/).map(n => n[0]).slice(0, 2).join("").toUpperCase()}</span>
+                  <span className="hidden text-left xl:block"><span className="block text-xs font-semibold">{user?.full_name || user?.username}</span><span className="block text-[11px] font-normal text-muted-foreground">{userRole && getRoleDisplayName(userRole)}</span></span>
+                  <ChevronDown className="hidden h-3 w-3 text-muted-foreground sm:block" />
                 </Button>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full hover:bg-gradient-to-br hover:from-blue-500/10 hover:to-purple-500/10 transition-all"
-                    >
-                      <User className="h-5 w-5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{user?.full_name || user?.username}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground font-normal">
-                          {user?.email}
-                        </span>
-                        {userRole && (
-                          <Badge className={cn("w-fit text-white", getRoleColor(userRole))}>
-                            {userRole === 'admin' && <Shield className="h-3 w-3 mr-1" />}
-                            {getRoleDisplayName(userRole)}
-                          </Badge>
-                        )}
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Logout
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </>
-            ) : (
-              <Link href="/login">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all">
-                  Sign In
-                </Button>
-              </Link>
-            )}
-          </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel><span className="block">{user?.full_name || user?.username}</span><span className="block truncate text-xs font-normal text-muted-foreground">{user?.email}</span></DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { logout(); router.push("/"); }}><LogOut className="mr-2 h-4 w-4" />Sign out</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : <Link href="/login" className="text-sm font-medium text-primary">Sign in</Link>}
         </div>
       </div>
-    </nav>
+      <nav aria-label="Mobile navigation" className="flex border-t px-2 lg:hidden">
+        {navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname.startsWith(href) ? "page" : undefined} className={cn("flex flex-1 items-center justify-center gap-1.5 border-b-2 px-1 py-3 text-[11px] font-medium sm:text-sm", pathname.startsWith(href) ? "border-primary text-primary" : "border-transparent text-muted-foreground")}><Icon className="h-3.5 w-3.5 shrink-0" />{label}</Link>)}
+      </nav>
+    </header>
   );
 }

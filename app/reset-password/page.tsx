@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AuthShell } from "@/components/AuthShell";
 import { BookOpen, Eye, EyeOff, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -166,20 +167,15 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-purple-100 p-4 relative overflow-hidden">
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-      </div>
-
-      <Card className="w-full max-w-md shadow-2xl border-2 border-white/50 backdrop-blur-sm bg-white/95 relative z-10">
-        <CardHeader className="space-y-3 text-center bg-gradient-to-r from-blue-50/50 to-purple-50/50 rounded-t-lg">
-          <div className="flex justify-center">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+    <AuthShell>
+      <Card className="w-full border-0 bg-transparent shadow-none">
+        <CardHeader className="space-y-3 px-0 pb-7">
+          <div className="flex justify-start pb-3">
+            <div className="h-12 w-12 rounded-xl bg-primary flex items-center justify-center">
               <BookOpen className="h-8 w-8 text-white" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <CardTitle className="text-3xl font-semibold tracking-tight">
             Reset password
           </CardTitle>
           <CardDescription className="text-base">
@@ -195,6 +191,6 @@ export default function ResetPasswordPage() {
           <ResetPasswordForm />
         </Suspense>
       </Card>
-    </div>
+    </AuthShell>
   );
 }

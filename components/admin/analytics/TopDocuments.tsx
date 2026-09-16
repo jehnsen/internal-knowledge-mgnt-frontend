@@ -48,7 +48,7 @@ export function TopDocuments({ documents }: TopDocumentsProps) {
                     )}
                   </div>
                 </div>
-                <Badge className="bg-gradient-to-r from-green-500 to-emerald-600 text-white flex-shrink-0">
+                <Badge className="bg-primary/10 text-primary flex-shrink-0">
                   {doc.access_count} views
                 </Badge>
               </div>

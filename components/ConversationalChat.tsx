@@ -32,10 +32,16 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
   const [selectedDocument, setSelectedDocument] = useState<{ doc: any; source?: SourceDocument } | null>(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = messagesContainerRef.current;
+    if (container) {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    }
   };
 
   // Helper function to detect knowledge gaps in assistant responses
@@ -75,7 +81,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (messages.length > 0) scrollToBottom();
   }, [messages]);
 
   // Load chat sessions once the user is authenticated (avoids a race-condition
@@ -237,10 +243,11 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
   };
 
   return (
-    <div className={cn("flex h-full gap-4", className)}>
+    <div className={cn("relative flex h-full", className)}>
+      <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)} aria-expanded={showHistory} className="absolute right-3 top-3 z-30 bg-card md:hidden"><History className="h-3.5 w-3.5" />{showHistory ? "Close history" : "History"}</Button>
       {/* Sidebar - Chat History */}
       <div className={cn(
-        "w-64 border-r bg-muted/30 flex flex-col transition-all",
+        "absolute inset-y-0 left-0 z-20 w-64 shrink-0 border-r bg-card flex flex-col md:static md:bg-muted/30",
         !showHistory && "hidden md:flex"
       )}>
         <div className="p-4 border-b">
@@ -254,6 +261,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
               size="sm"
               onClick={startNewConversation}
               className="h-8 px-2"
+              aria-label="Start a new conversation"
             >
               <MessageSquare className="h-4 w-4" />
             </Button>
@@ -263,7 +271,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
         <div className="flex-1 overflow-y-auto p-2">
           {sessionsLoading ? (
             <div className="text-center py-8 px-4">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-blue-600" />
+              <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
               <p className="text-xs text-muted-foreground">
                 Loading conversations...
               </p>
@@ -335,9 +343,9 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        <div ref={messagesContainerRef} className="min-h-0 flex-1 overflow-y-auto p-4 space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -346,14 +354,13 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
           )}
 
           {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="h-16 w-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
-                <Bot className="h-8 w-8 text-white" />
+            <div className="text-center px-3 py-16 sm:py-20">
+              <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center mx-auto mb-4">
+                <Bot className="h-8 w-8 text-primary-foreground" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Start a Conversation</h3>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Ask me anything about your documents. I'll remember our conversation context,
-                so feel free to ask follow-up questions!
+              <h3 className="text-2xl font-semibold tracking-tight mb-3">Make room for a better answer.</h3>
+              <p className="text-sm leading-7 text-muted-foreground max-w-md mx-auto">
+                Ask a question about your team’s knowledge, then explore the details with follow-up questions and source citations.
               </p>
               <div className="mt-6 flex flex-wrap gap-2 justify-center">
                 <Badge variant="outline" className="text-xs">
@@ -378,8 +385,8 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
               >
                 {message.role === 'assistant' && (
                   <div className="flex-shrink-0">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                      <Bot className="h-5 w-5 text-white" />
+                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                      <Bot className="h-5 w-5 text-primary-foreground" />
                     </div>
                   </div>
                 )}
@@ -403,7 +410,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
                     <Card className={cn(
                       "shadow-sm",
                       message.role === 'user'
-                        ? "bg-gradient-to-br from-blue-600 to-purple-600 text-white border-none"
+                        ? "bg-primary text-primary-foreground border-none"
                         : "bg-card"
                     )}>
                       <CardContent className="p-4">
@@ -422,7 +429,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
                         <span>Based on </span>
                         <button
                           onClick={() => handleSourceClick(message.sources![0])}
-                          className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                          className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
                         >
                           <FileText className="h-3 w-3" />
                           {message.sources[0].title}
@@ -435,7 +442,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
                             <span> and </span>
                             <button
                               onClick={() => toggleSourcesExpanded(idx)}
-                              className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
                             >
                               {message.sources.length - 1} more source{message.sources.length > 2 ? 's' : ''}
                               {expandedSources.has(idx) ? (
@@ -488,7 +495,7 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
                 {message.role === 'user' && (
                   <div className="flex-shrink-0">
                     <div className="h-8 w-8 rounded-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center">
-                      <User className="h-5 w-5 text-white" />
+                      <User className="h-5 w-5 text-primary-foreground" />
                     </div>
                   </div>
                 )}
@@ -499,14 +506,14 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
           {isLoading && (
             <div className="flex gap-3 animate-fade-in">
               <div className="flex-shrink-0">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <Bot className="h-5 w-5 text-white" />
+                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+                  <Bot className="h-5 w-5 text-primary-foreground" />
                 </div>
               </div>
               <Card className="bg-card shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
                     <p className="text-sm text-muted-foreground">
                       Thinking and searching knowledge base...
                     </p>
@@ -516,25 +523,25 @@ export function ConversationalChat({ className }: ConversationalChatProps) {
             </div>
           )}
 
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="border-t bg-background/95 backdrop-blur-sm p-4">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Input
+              aria-label="Message the knowledge assistant"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={sessionId ? "Ask a follow-up question..." : "Start a conversation..."}
               disabled={isLoading}
-              className="flex-1 bg-background"
-              autoFocus
+              className="h-12 flex-1 bg-card"
             />
             <Button
+              aria-label="Send message"
               type="submit"
               disabled={isLoading || !input.trim()}
               size="icon"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              className="h-12 w-12 bg-primary"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

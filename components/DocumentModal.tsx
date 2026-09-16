@@ -191,11 +191,11 @@ function CitedPassage({
   return (
     <div className="mb-6 animate-fade-in">
       <div className="flex items-center gap-2 mb-3 flex-wrap">
-        <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+        <Badge className="bg-primary/10 text-primary">
           {citation?.citation_id ? `Cited Passage [${citation.citation_id}]` : 'Relevant Excerpt'}
         </Badge>
         {citation?.locator && (
-          <Badge variant="outline" className="text-xs font-medium text-blue-700 border-blue-500/50">
+          <Badge variant="outline" className="text-xs font-medium text-primary border-primary/30">
             {citation.locator}
           </Badge>
         )}
@@ -215,7 +215,7 @@ function CitedPassage({
           </span>
         )}
       </div>
-      <div className="bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-950/20 dark:to-purple-950/20 border-l-4 border-blue-500 p-5 rounded-r-xl shadow-sm">
+      <div className="bg-primary/5 border-l-2 border-primary p-5 rounded-r-xl shadow-sm">
         <div className="space-y-3">{parseStructuredContent(passage, searchTerms)}</div>
       </div>
     </div>
@@ -409,6 +409,7 @@ export function DocumentModal({
               variant="ghost"
               size="icon"
               onClick={onClose}
+              aria-label="Close document preview"
               className="flex-shrink-0 -mt-2 -mr-2"
             >
               <X className="h-4 w-4" />
@@ -456,8 +457,8 @@ export function DocumentModal({
           {/* Document Source */}
           {document.file_path && (
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-              <div className="h-10 w-10 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <File className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <File className="h-5 w-5 text-primary" />
               </div>
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Source File</p>
@@ -496,11 +497,11 @@ export function DocumentModal({
               <TabsContent value="preview" className="flex-1 mt-0">
                 {citedPage && (
                   <div className="mb-3 flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                    <Badge className="bg-primary/10 text-primary">
                       Opened at the cited page
                     </Badge>
                     {citation?.locator && (
-                      <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                      <span className="text-xs font-medium text-primary">
                         {citation.locator}
                       </span>
                     )}
@@ -539,7 +540,7 @@ export function DocumentModal({
                 <div className="mb-3 flex items-center gap-2 flex-wrap">
                   <h3 className="text-sm font-semibold">Full Document Content</h3>
                   {citedPassage && (
-                    <Badge variant="outline" className="text-xs text-blue-700 border-blue-500/50">
+                    <Badge variant="outline" className="text-xs text-primary border-primary/30">
                       Cited passage highlighted
                     </Badge>
                   )}
@@ -576,7 +577,7 @@ export function DocumentModal({
               <div className="mb-3 flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm font-semibold">Full Document Content</h3>
                 {citedPassage && (
-                  <Badge variant="outline" className="text-xs text-blue-700 border-blue-500/50">
+                  <Badge variant="outline" className="text-xs text-primary border-primary/30">
                     Cited passage highlighted
                   </Badge>
                 )}
@@ -638,7 +639,7 @@ export function DocumentModal({
               <Button
                 onClick={handleDownload}
                 disabled={isDownloading}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="bg-primary hover:bg-primary/90"
               >
                 <Download className="h-4 w-4 mr-2" />
                 {isDownloading ? 'Downloading...' : 'Download'}

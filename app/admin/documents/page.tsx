@@ -32,7 +32,7 @@ export default function DocumentsPage() {
     try {
       const docsResponse: any = await DocumentAPI.getDocuments(0, 100);
       console.log('✅ Loaded documents:', docsResponse);
-      setDocuments(docsResponse || []);
+      setDocuments(docsResponse.items ?? []);
     } catch (err) {
       console.error('❌ Failed to load documents:', err);
       toast.error('Failed to load documents');
@@ -83,19 +83,20 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold mb-2">Document Management</h1>
           <p className="text-muted-foreground">
             Manage all documents in the knowledge base ({documents?.length || 0} total)
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="flex border rounded-lg">
             <Button
               variant={viewMode === "table" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setViewMode("table")}
+              aria-label="Table view"
               className="rounded-r-none"
             >
               <Table className="h-4 w-4" />
@@ -104,6 +105,7 @@ export default function DocumentsPage() {
               variant={viewMode === "cards" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setViewMode("cards")}
+              aria-label="Card view"
               className="rounded-l-none"
             >
               <LayoutGrid className="h-4 w-4" />
@@ -111,13 +113,14 @@ export default function DocumentsPage() {
           </div>
           <Input
             placeholder="Search documents..."
+            aria-label="Search documents"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             className="w-64"
           />
           <Button
             onClick={() => setShowUpload(true)}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            className="bg-primary hover:bg-primary/90"
           >
             <Upload className="h-4 w-4 mr-2" />
             Upload

@@ -27,16 +27,11 @@ export function AdminSidebar({ onRefresh }: AdminSidebarProps) {
   const visibleItems = sidebarItems.filter((item) => !item.adminOnly || user?.role === "admin");
 
   return (
-    <aside className="w-64 min-h-screen bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 sticky top-0">
-      <div className="p-6">
-        {/* <h2 className="text-lg font-bold mb-1 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-          Admin Dashboard
-        </h2>
-        <p className="text-xs text-muted-foreground mb-6">
-          System Management
-        </p> */}
+    <aside className="w-full shrink-0 border-b bg-card md:sticky md:top-20 md:h-[calc(100dvh-80px)] md:w-56 md:overflow-y-auto md:border-b-0 md:border-r">
+      <div className="p-3 md:p-5">
 
-        <nav className="space-y-1">
+        <p className="eyebrow mb-5 hidden px-3 pt-3 md:block">Management</p>
+        <nav aria-label="Management navigation" className="flex gap-1 overflow-x-auto md:block md:space-y-1">
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
@@ -46,9 +41,9 @@ export function AdminSidebar({ onRefresh }: AdminSidebarProps) {
                 key={item.id}
                 onClick={() => router.push(item.path)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                  "shrink-0 md:w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                   isActive
-                    ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                    ? "bg-primary/10 text-primary"
                     : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                 )}
               >

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { MessageSquare, Upload, Library } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
+import { MessageSquare, Upload, Library, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,15 +16,21 @@ import { Document as UIDocument } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { canUploadDocuments, canDeleteDocuments, canAccessChat } from "@/lib/rbac";
 
+import { useSearchParams, useRouter } from "next/navigation";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+
 const PAGE_SIZE = 10;
 
 type Tab = 'chat' | 'upload' | 'documents';
 
-export default function KnowledgePage() {
+function KnowledgeWorkspace() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuth();
   const userRole = user?.role as 'guest' | 'employee' | 'admin' | undefined;
 
-  const [activeTab, setActiveTab] = useState<Tab>('chat');
+  const requestedTab = searchParams.get("tab");
+  const activeTab: Tab = requestedTab === "documents" ? "documents" : requestedTab === "upload" && canUploadDocuments(userRole) ? "upload" : canAccessChat(userRole) ? "chat" : "documents";
 
   // Document list state
   const [apiDocuments, setApiDocuments] = useState<APIDocument[]>([]);  // raw API docs (needed for viewer)
@@ -111,21 +117,23 @@ export default function KnowledgePage() {
   const tabs = allTabs.filter(tab => tab.permission());
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50/20 to-blue-50/30">
+    <div className="min-h-screen bg-background">
 
+      <div className="workspace-container pb-7 pt-9"><p className="eyebrow mb-2">Connected knowledge</p><div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-semibold tracking-tight">Your AI workspace</h1><p className="mt-2 text-sm text-muted-foreground">Explore ideas, manage sources, and keep the conversation going.</p></div><span className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-primary"><Sparkles className="h-3.5 w-3.5" />Powered by RAG</span></div></div>
       {/* Tab navigation */}
-      <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-4">
-          <div className="flex gap-1 py-2">
+      <div className="border-b bg-card">
+        <div className="workspace-container">
+          <div className="flex gap-1 overflow-x-auto py-2">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                  onClick={() => router.replace("/chat?tab=" + tab.id, { scroll: false })}
+                  aria-pressed={activeTab === tab.id}
+                  className={`flex shrink-0 items-center gap-2 px-3 py-2.5 text-xs sm:text-sm font-medium rounded-lg transition-colors ${
                     activeTab === tab.id
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >
@@ -139,16 +147,16 @@ export default function KnowledgePage() {
       </div>
 
       {/* Tab Content */}
-      <div className="container mx-auto px-4 py-6 min-h-[600px]">
+      <div className="workspace-container py-6 min-h-[600px]">
         {activeTab === 'chat' && (
-          <Card className="h-[700px] flex flex-col overflow-hidden">
+          <Card className="h-[min(760px,calc(100dvh-200px))] min-h-[520px] flex flex-col overflow-hidden">
             <CardHeader className="border-b">
-              <CardTitle>AI Chat Assistant</CardTitle>
+              <CardTitle>Knowledge assistant</CardTitle>
               <CardDescription>
                 Have a natural conversation with context-aware responses and source citations
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 p-0 overflow-hidden">
+            <CardContent className="min-h-0 flex-1 p-0 overflow-hidden">
               <ConversationalChat />
             </CardContent>
           </Card>
@@ -232,4 +240,8 @@ export default function KnowledgePage() {
       )}
     </div>
   );
+}
+
+export default function KnowledgePage() {
+  return <ProtectedRoute><Suspense fallback={<LoadingState message="Opening your workspace..." />}><KnowledgeWorkspace /></Suspense></ProtectedRoute>;
 }

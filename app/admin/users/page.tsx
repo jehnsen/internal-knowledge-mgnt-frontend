@@ -144,7 +144,7 @@ export default function UsersPage() {
         </div>
         <Button
           onClick={() => setShowAddUserDialog(true)}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          className="bg-primary hover:bg-primary/90"
         >
           <UserPlus className="h-4 w-4 mr-2" />
           Add User
@@ -177,7 +177,7 @@ export default function UsersPage() {
                   className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
+                    <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
                       {user.username && user.username.charAt(0).toUpperCase() || ''}
                     </div>
                     <div>
@@ -274,7 +274,7 @@ export default function UsersPage() {
               {/* Activity Stats */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 border rounded-lg text-center">
-                  <p className="text-2xl font-bold text-blue-600">{userActivity.search_count}</p>
+                  <p className="text-2xl font-bold text-primary">{userActivity.search_count}</p>
                   <p className="text-xs text-muted-foreground">Searches</p>
                 </div>
                 <div className="p-4 border rounded-lg text-center">
@@ -404,7 +404,7 @@ export default function UsersPage() {
               <Button
                 onClick={handleAddUser}
                 disabled={loading}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                className="flex-1 bg-primary hover:bg-primary/90"
               >
                 <UserPlus className="h-4 w-4 mr-2" />
                 {loading ? 'Creating...' : 'Create User'}

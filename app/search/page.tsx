@@ -7,12 +7,15 @@ import {
   Upload,
   FileText,
   Sparkles,
-  MessageSquare,
   History,
   Clock,
   X,
-  Eye,
-  TrendingUp,
+  ArrowUpRight,
+  ArrowRight,
+  BookOpen,
+  Layers3,
+  Quote,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,10 +45,10 @@ function EvidenceRow({
   const score = Math.round(source.relevance_score * 100);
   const scoreClass =
     score >= 70
-      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+      ? 'bg-primary/10 text-primary'
       : score >= 40
-        ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
+        ? 'bg-secondary text-secondary-foreground'
+        : 'bg-amber-500/10 text-amber-700 dark:text-amber-300';
 
   return (
     <div
@@ -68,7 +71,7 @@ function EvidenceRow({
                 [{source.citation_id}]
               </Badge>
             )}
-            <p className="text-xs font-bold text-foreground group-hover:text-blue-600 transition-colors truncate">
+            <p className="text-xs font-bold text-foreground group-hover:text-primary transition-colors truncate">
               {source.title}
             </p>
           </div>
@@ -117,6 +120,7 @@ export default function Dashboard() {
   const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
   const [documents, setDocuments] = useState<APIDocument[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+  const [documentError, setDocumentError] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<{
     doc: any;
     result?: SearchResult;
@@ -145,7 +149,7 @@ export default function Dashboard() {
         const response = await DocumentAPI.getDocuments(0, 20);
         setDocuments(response.items ?? []);
       } catch (err) {
-        // Silently handle errors
+        setDocumentError(true);
         setDocuments([]);
       } finally {
         setIsLoadingDocs(false);
@@ -313,157 +317,48 @@ export default function Dashboard() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
-        {/* Hero Search Section */}
-        <section className="border-b bg-gradient-to-r from-background/95 via-blue-50/50 to-purple-50/50 backdrop-blur-sm">
-          <div className="container mx-auto px-4 py-12">
-            <div className="max-w-4xl mx-auto text-center mb-8 animate-fade-in">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-full mb-4">
-                <Sparkles className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  AI-Powered Semantic Search
-                </span>
-              </div>
-              {/* <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-gray-900 via-blue-900 to-purple-900 bg-clip-text text-transparent">
-                What would you like to know?
-              </h1> */}
-              <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-red-900 via-red-600 to-red-400 bg-clip-text text-transparent">
-                Access Hire Australia
-              </h1>
-              <p className="text-xl text-muted-foreground">
-                Search your knowledge base using natural language
-              </p>
-            </div>
+      <div className="min-h-screen bg-background">
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="max-w-3xl mx-auto animate-slide-in-from-bottom relative">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-blue-600 transition-colors" />
-                <Input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setShowHistory(true)}
-                  placeholder="Ask anything... e.g., 'What is the remote work policy?'"
-                  className="pl-12 pr-44 h-14 text-lg shadow-lg border-2 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 rounded-2xl transition-all"
-                  disabled={isSearching}
-                />
-                {/* <div className="absolute right-32 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  {searchHistory.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowHistory(!showHistory)}
-                      className="h-8"
-                    >
-                      <History className="h-4 w-4 mr-1" />
-                      History
-                    </Button>
-                  )}
-                </div> */}
-                <Button
-                  type="submit"
-                  disabled={isSearching || !searchQuery.trim()}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all shadow-lg"
-                >
-                  {isSearching ? (
-                    <span className="flex items-center gap-2">
-                      <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Searching...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Search
-                    </span>
-                  )}
-                </Button>
-              </div>
-
-              {/* Search History Dropdown */}
-              {showHistory && searchHistory.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-background border-2 rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto">
-                  <div className="p-3 border-b bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-semibold flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Recent Searches
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowHistory(false)}
-                        className="h-6 w-6 p-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="p-2">
-                    {searchHistory.slice(0, 10).map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-accent transition-colors cursor-pointer group"
-                        onClick={() => handleSearch(undefined, item.query)}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm truncate">{item.query}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(item.timestamp).toLocaleDateString()} • {item.resultsCount} results
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeFromSearchHistory(item.query);
-                            setSearchHistory(getSearchHistory());
-                          }}
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+        <section className="workspace-container pt-8 sm:pt-10">
+          <div className="mb-7 flex flex-wrap items-center justify-between gap-4">
+            <div><p className="eyebrow mb-2">Your knowledge workspace</p><h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">A little clarity goes a long way.</h1><p className="mt-2 text-sm text-muted-foreground">Find what you need. Understand what matters.</p></div>
+            {canUploadDocuments(userRole) && <Button variant="outline" onClick={() => setShowUpload(true)} className="bg-card"><Upload className="h-4 w-4" />Upload documents</Button>}
+          </div>
+          <div className="relative rounded-2xl border bg-card p-5 shadow-sm sm:p-9">
+            <div className="knowledge-grid pointer-events-none absolute inset-y-0 right-0 w-1/3 rounded-r-2xl opacity-60 [mask-image:linear-gradient(to_right,transparent,black)]" aria-hidden="true" />
+            <div className="relative">
+              <div className="mb-5 flex items-center gap-2 text-xs font-medium text-primary"><Sparkles className="h-4 w-4" />RAG-powered knowledge search</div>
+              <h2 className="text-2xl font-semibold tracking-tight sm:text-[32px]">What would you like to know?</h2>
+              <p className="mb-6 mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">Ask a question in your own words. Get a grounded answer with references to your team’s documents.</p>
+              <form onSubmit={handleSearch} className="relative" role="search">
+                <label htmlFor="knowledge-query" className="sr-only">Search your internal knowledge base</label>
+                <div className="flex flex-col gap-2 rounded-xl border bg-background p-2 shadow-sm transition-shadow focus-within:border-primary/50 focus-within:ring-4 focus-within:ring-primary/5 sm:flex-row sm:items-center">
+                  <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" /><Input id="knowledge-query" type="search" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onFocus={() => setShowHistory(true)} onKeyDown={e => { if (e.key === "Escape") setShowHistory(false); }} placeholder="Ask about policies, processes, or team knowledge…" className="h-12 border-0 bg-transparent pl-11 text-sm shadow-none focus-visible:ring-0 sm:text-base" disabled={isSearching} /></div>
+                  <Button type="submit" disabled={isSearching || !searchQuery.trim()} className="h-11 px-5">{isSearching ? <><Loader2 className="h-4 w-4 animate-spin" />Searching…</> : <>Find answers<ArrowRight className="h-4 w-4" /></>}</Button>
                 </div>
-              )}
-            </form>
-
-            {/* Quick Actions */}
-            <div className="max-w-3xl mx-auto mt-6 flex gap-3 justify-center flex-wrap">
-              {canUploadDocuments(userRole) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowUpload(true)}
-                  className="gap-2 hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-purple-500/10 hover:border-blue-500/50 transition-all"
-                >
-                  <Upload className="h-4 w-4" />
-                  Upload Document
-                </Button>
-              )}
-              {canAccessChat(userRole) && (
-                <Link href="/knowledge">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-pink-500/10 hover:border-purple-500/50 transition-all"
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Chat Assistant
-                  </Button>
-                </Link>
-              )}
+                {showHistory && searchHistory.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-80 overflow-y-auto rounded-xl border bg-card p-2 shadow-xl">
+                    <div className="flex items-center justify-between border-b px-3 py-2"><span className="eyebrow">Recent searches</span><Button type="button" variant="ghost" size="icon" aria-label="Close search history" onClick={() => setShowHistory(false)}><X className="h-4 w-4" /></Button></div>
+                    {searchHistory.slice(0, 6).map(item => <div key={item.query} className="flex items-center gap-2 rounded-lg hover:bg-muted"><button type="button" onClick={() => handleSearch(undefined, item.query)} className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left text-sm"><History className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="truncate">{item.query}</span></button><Button type="button" variant="ghost" size="icon" aria-label={`Remove search: ${item.query}`} onClick={() => { removeFromSearchHistory(item.query); setSearchHistory(getSearchHistory()); }}><X className="h-3.5 w-3.5" /></Button></div>)}
+                  </div>
+                )}
+              </form>
+              <div className="mt-5 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs text-muted-foreground">Try asking</span>{["What is our remote work policy?", "How do I onboard a new team member?", "Where can I find IT guidelines?"].map(query => <button key={query} disabled={isSearching} onClick={() => handleSearch(undefined, query)} className="rounded-full border bg-card px-3 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50">{query}<ArrowUpRight className="ml-1 inline h-3 w-3" /></button>)}</div>
             </div>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {[
+              { icon: Search, title: "Search with meaning", text: "Find relevant knowledge, beyond keywords." },
+              { icon: Quote, title: "Follow the evidence", text: "Open citations to explore the original source." },
+              { icon: Layers3, title: "Build on shared knowledge", text: "Bring your team’s documents into one place." },
+            ].map(({ icon: Icon, title, text }) => <div key={title} className="flex items-start gap-3 px-2 py-3"><Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" strokeWidth={1.6} /><div><p className="text-xs font-semibold">{title}</p><p className="mt-1 text-[11px] leading-5 text-muted-foreground">{text}</p></div></div>)}
           </div>
         </section>
 
-        <div className="container mx-auto px-4 py-8">
+        <div className="workspace-container py-8">
           {/* Search error */}
           {searchError && (
-            <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
               {searchError}
             </div>
           )}
@@ -473,21 +368,21 @@ export default function Dashboard() {
             <div className="mb-12 animate-fade-in">
               {/* AI Answer */}
               {searchResults.answer && (
-                <Card className="mb-6 border-2 border-blue-500/30 shadow-xl bg-gradient-to-br from-white to-blue-50/30 animate-slide-in-from-bottom">
+                <Card className="mb-6 border-primary/25 bg-card shadow-sm animate-slide-in-from-bottom">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shadow-lg">
-                          <Sparkles className="h-6 w-6 text-white" />
+                        <div className="h-11 w-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                          <Sparkles className="h-5 w-5" />
                         </div>
                         <div>
-                          <CardTitle className="text-xl">AI-Generated Answer</CardTitle>
+                          <CardTitle className="text-xl">Answer from your knowledge base</CardTitle>
                           <CardDescription>Powered by {searchResults.search_method} search • {searchResults.execution_time.toFixed(2)}s</CardDescription>
                         </div>
                       </div>
                       <Badge className={citedSources.length === 0
-                        ? "bg-gradient-to-r from-red-500 to-orange-500 text-white"
-                        : "bg-gradient-to-r from-green-500 to-emerald-500 text-white"
+                        ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                        : "bg-primary/10 text-primary"
                       }>
                         {citedSources.length} Cited Source{citedSources.length !== 1 ? 's' : ''}
                       </Badge>
@@ -509,7 +404,7 @@ export default function Dashboard() {
                     {citedSources.length > 0 && (
                       <div className="border-t pt-4 mt-4">
                         <p className="text-sm font-semibold flex items-center gap-2 mb-3">
-                          <FileText className="h-4 w-4 text-blue-600" />
+                          <FileText className="h-4 w-4 text-primary" />
                           Evidence for this answer
                         </p>
                         <div className="grid gap-2">
@@ -550,7 +445,7 @@ export default function Dashboard() {
                 <div className="mb-8 animate-fade-in">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-blue-600" />
+                      <FileText className="h-5 w-5 text-primary" />
                       Search Results
                     </h2>
                     <span className="text-sm text-muted-foreground">
@@ -563,7 +458,10 @@ export default function Dashboard() {
                     {displayedResults.map((result, idx) => (
                       <Card
                         key={`${result.document_id}-${idx}`}
-                        className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all border-l-4 border-l-blue-400"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); } }}
+                        className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all hover:border-primary/30"
                         onClick={() => handleDocumentView({
                           id: result.document_id,
                           title: result.title,
@@ -596,10 +494,10 @@ export default function Dashboard() {
                             </div>
                             <Badge className={`flex-shrink-0 ${
                               result.relevance_score >= 0.7
-                                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                                ? 'bg-primary/10 text-primary'
                                 : result.relevance_score >= 0.4
-                                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white'
+                                  ? 'bg-secondary text-secondary-foreground'
+                                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-300'
                             }`}>
                               {Math.round(result.relevance_score * 100)}%
                             </Badge>
@@ -643,7 +541,7 @@ export default function Dashboard() {
                   onUploadClick={canUploadDocuments(userRole) ? () => setShowUpload(true) : undefined}
                   onRefineQuery={() => {
                     // Focus on search input
-                    document.querySelector<HTMLInputElement>('input[type="text"]')?.focus();
+                    document.querySelector<HTMLInputElement>('#knowledge-query')?.focus();
                   }}
                   className="animate-fade-in"
                 />
@@ -651,163 +549,24 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Recently Viewed & Recent Documents (when no search) */}
+
           {!searchResults && (
-            <div className="space-y-12">
-              {/* Recently Viewed Documents */}
-              {recentlyViewed && recentlyViewed.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <Eye className="h-6 w-6 text-blue-600" />
-                        Recently Viewed
-                      </h2>
-                      <p className="text-muted-foreground">Documents you've opened recently</p>
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {recentlyViewed.slice(0, 6).map((viewedDoc, index) => {
-                      // Find full document from documents array
-                      const fullDoc = documents?.find(d => d.id === viewedDoc.id);
-
-                      return (
-                        <Card
-                          key={viewedDoc.id}
-                          className="hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group animate-fade-in border-l-4 border-l-blue-500"
-                          style={{ animationDelay: `${index * 50}ms` }}
-                          onClick={() => fullDoc && handleDocumentView(fullDoc)}
-                        >
-                          <CardHeader>
-                            <div className="flex items-start gap-3">
-                              <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                                <Eye className="h-5 w-5 text-blue-600" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <CardTitle className="text-lg group-hover:text-blue-600 transition-colors line-clamp-1">
-                                  {viewedDoc.title}
-                                </CardTitle>
-                                <CardDescription className="text-xs flex items-center gap-1 mt-1">
-                                  <Clock className="h-3 w-3" />
-                                  Viewed {new Date(viewedDoc.timestamp).toLocaleDateString()}
-                                </CardDescription>
-                              </div>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            {fullDoc && (
-                              <>
-                                <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                                  {fullDoc.content.substring(0, 100)}...
-                                </p>
-                                <Badge variant="secondary" className="text-xs">
-                                  {viewedDoc.fileType || fullDoc.file_type || 'Document'}
-                                </Badge>
-                              </>
-                            )}
-                            {!fullDoc && (
-                              <p className="text-xs text-muted-foreground italic">
-                                Click to view document details
-                              </p>
-                            )}
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Recent Uploads Section */}
-              {(documents && documents.length > 0) && (
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <div>
-                      <h2 className="text-2xl font-bold flex items-center gap-2">
-                        <TrendingUp className="h-6 w-6 text-green-600" />
-                        Latest Updates
-                      </h2>
-                      <p className="text-muted-foreground">Recent additions to the knowledge base</p>
-                    </div>
-                    {canUploadDocuments(userRole) && (
-                      <Link href="/knowledge">
-                        <Button>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload New
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-
-                  {isLoadingDocs ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[1, 2, 3, 4, 5, 6].map((i) => (
-                      <div key={i} className="h-48 bg-muted animate-pulse rounded-lg" />
-                    ))}
-                  </div>
-                ) : documents && documents.length > 0 ? (
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {documents.slice(0, 6).map((doc, index) => (
-                      <Card
-                        key={doc.id}
-                        className="hover:shadow-lg hover:-translate-y-1 transition-all cursor-pointer group animate-fade-in border-l-4 border-l-green-500"
-                        style={{ animationDelay: `${index * 50}ms` }}
-                        onClick={() => handleDocumentView(doc)}
-                      >
-                        <CardHeader>
-                          <div className="flex items-start gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                              <TrendingUp className="h-5 w-5 text-green-600" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-lg group-hover:text-green-600 transition-colors line-clamp-1">
-                                {doc.title}
-                              </CardTitle>
-                              <CardDescription className="text-xs flex items-center gap-1">
-                                <Upload className="h-3 w-3" />
-                                {new Date(doc.created_at).toLocaleDateString()}
-                              </CardDescription>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                            {doc.content.substring(0, 100)}...
-                          </p>
-                          <Badge
-                            variant={doc.embedding && doc.embedding.length > 0 ? "default" : "secondary"}
-                            className="text-xs"
-                          >
-                            {doc.embedding && doc.embedding.length > 0 ? 'Indexed' : 'Processing'}
-                          </Badge>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="text-center py-12">
-                    <CardContent>
-                      <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold mb-2">No documents yet</h3>
-                      <p className="text-muted-foreground mb-6">
-                        Upload your first document to get started
-                      </p>
-                      {canUploadDocuments(userRole) && (
-                        <Link href="/knowledge">
-                          <Button size="lg">
-                            <Upload className="h-5 w-5 mr-2" />
-                            Upload Document
-                          </Button>
-                        </Link>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+              <section className="min-w-0 rounded-xl border bg-card shadow-sm">
+                <div className="flex items-center justify-between gap-3 border-b p-5 sm:px-6"><div><h2 className="text-base font-semibold">Your knowledge library</h2><p className="mt-1 text-xs text-muted-foreground">Explore the latest documents available to you.</p></div><Link href="/chat?tab=documents" className="flex shrink-0 items-center gap-1 text-xs font-medium text-primary">View all<ArrowUpRight className="h-3.5 w-3.5" /></Link></div>
+                {isLoadingDocs ? <div className="space-y-4 p-6" role="status" aria-label="Loading documents">{[1, 2, 3].map(i => <div key={i} className="h-16 animate-pulse rounded-lg bg-muted" />)}</div>
+                  : documentError ? <div className="p-10 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground" /><h3 className="text-sm font-semibold">Documents couldn’t be loaded</h3><p className="mt-2 text-xs text-muted-foreground">Please try again from the document library.</p><Link href="/chat?tab=documents" className="mt-4 inline-block text-sm font-medium text-primary">Open document library →</Link></div>
+                  : documents.length > 0 ? <div className="divide-y">{documents.slice(0, 5).map(doc => <button key={doc.id} onClick={() => handleDocumentView(doc)} className="group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/50 sm:px-6"><span className="flex h-11 w-10 shrink-0 items-center justify-center rounded-lg border bg-background"><FileText className="h-5 w-5 text-primary" strokeWidth={1.5} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-medium group-hover:text-primary">{doc.title}</span><span className="mt-1 block truncate text-xs text-muted-foreground">{doc.category || "Team knowledge"} · {new Date(doc.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span></span><span className="hidden rounded-md border bg-background px-2 py-1 text-[10px] uppercase text-muted-foreground sm:block">{doc.file_type?.split("/").pop() || "Document"}</span><ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" /></button>)}</div>
+                  : <div className="px-6 py-12 text-center"><span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted"><BookOpen className="h-6 w-6 text-primary" strokeWidth={1.5} /></span><h3 className="text-sm font-semibold">Your shared knowledge starts here</h3><p className="mx-auto mt-2 max-w-xs text-xs leading-6 text-muted-foreground">{canUploadDocuments(userRole) ? "Add your first document to make it discoverable through search and AI answers." : "Documents shared with you will appear here. Ask your administrator to add team resources."}</p>{canUploadDocuments(userRole) && <Button variant="outline" size="sm" onClick={() => setShowUpload(true)} className="mt-5"><Upload className="h-3.5 w-3.5" />Upload a document</Button>}</div>}
+              </section>
+              <aside className="space-y-5">
+                {canAccessChat(userRole) && <div className="rounded-xl bg-[#153d32] p-6 text-white"><span className="mb-5 flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5"><Sparkles className="h-4 w-4 text-emerald-200" /></span><h2 className="text-base font-medium">Go deeper with AI.</h2><p className="mb-5 mt-2 text-xs leading-6 text-emerald-50/70">Connect ideas, ask follow-up questions, and explore your documents in a conversation.</p><Link href="/chat" className="flex items-center justify-between border-t border-white/15 pt-4 text-xs font-medium text-emerald-100">Start a conversation<ArrowRight className="h-4 w-4" /></Link></div>}
+                <div className="rounded-xl border bg-card p-5"><h2 className="mb-4 flex items-center gap-2 text-xs font-semibold"><Clock className="h-3.5 w-3.5 text-muted-foreground" />Recently viewed</h2>{recentlyViewed.length ? <div className="space-y-1">{recentlyViewed.slice(0, 4).map(doc => <Link key={doc.id} href={`/documents/${doc.id}`} className="group flex items-center gap-2 rounded-lg py-2 text-xs"><FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /><span className="truncate group-hover:text-primary">{doc.title}</span><ArrowUpRight className="ml-auto h-3 w-3 shrink-0 text-muted-foreground" /></Link>)}</div> : <p className="text-xs leading-6 text-muted-foreground">Pick up where you left off. Documents you open will appear here.</p>}</div>
+              </aside>
             </div>
           )}
+          <div className="mt-10 flex flex-wrap items-center justify-between gap-2 border-t pt-5 text-[10px] text-muted-foreground"><span>Internal Knowledge Management System</span><span>Powered by RAG · Built around your knowledge</span></div>
+
         </div>
 
         {/* Document Modal */}
@@ -826,9 +585,9 @@ export default function Dashboard() {
         {showUpload && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-background rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-zoom-in">
-              <div className="p-6 border-b flex items-center justify-between bg-gradient-to-r from-blue-500/5 to-purple-500/5">
+              <div className="p-6 border-b flex items-center justify-between bg-muted/40">
                 <div>
-                  <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  <h2 className="text-xl font-semibold">
                     Upload Documents
                   </h2>
                   <p className="text-muted-foreground">Add documents to your knowledge base</p>

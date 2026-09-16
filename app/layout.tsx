@@ -13,8 +13,8 @@ import { ServiceUnavailableBanner } from "@/components/ServiceUnavailableBanner"
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Internal Knowledge Management",
-  description: "Your team's central hub for knowledge sharing and collaboration",
+  title: "Internal Knowledge Management System",
+  description: "Discover your team's knowledge with RAG-powered search, contextual answers, and source citations.",
 };
 
 export default function RootLayout({
