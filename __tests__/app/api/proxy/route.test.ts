@@ -184,3 +184,46 @@ describe('BFF proxy – POST request', () => {
     expect(options.method).toBe('POST');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Null-body statuses
+// ---------------------------------------------------------------------------
+describe('BFF proxy – null-body statuses', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('relays a 204 No Content instead of failing with a 500', async () => {
+    // e.g. POST /audit/log/batch - a Response with any body and status 204
+    // throws in the constructor, which used to surface as a 500.
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
+
+    const req = makeRequest('http://localhost:3000/api/proxy/audit/log/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ events: [] }),
+    });
+    const res = await POST(req, pathParams(['audit', 'log', 'batch']));
+
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
+  });
+
+  it('relays a 204 returned by the retry after a token refresh', async () => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ detail: 'expired' }, 401))
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'fresh-token' }, 200))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const req = makeRequest('http://localhost:3000/api/proxy/audit/log/batch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: 'access_token=stale; refresh_token=valid',
+      },
+      body: JSON.stringify({ events: [] }),
+    });
+    const res = await POST(req, pathParams(['audit', 'log', 'batch']));
+
+    expect(res.status).toBe(204);
+    expect(res.body).toBeNull();
+  });
+});

@@ -41,6 +41,17 @@ async function tryRefreshToken(refreshToken: string): Promise<string | null> {
   }
 }
 
+// Statuses the Fetch spec forbids from carrying a body. Passing one anything
+// but `null` - even an empty ArrayBuffer - makes the Response constructor
+// throw, which Next surfaces as a 500 for an otherwise successful request.
+const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+
+/** Rebuild a backend response for the client, respecting null-body statuses. */
+async function relayResponse(res: Response, headers: Headers): Promise<NextResponse> {
+  const body = NULL_BODY_STATUSES.has(res.status) ? null : await res.arrayBuffer();
+  return new NextResponse(body, { status: res.status, headers });
+}
+
 /** Stamp a NextResponse with expired-cookie headers to force client logout. */
 function clearAuthCookies(res: NextResponse): NextResponse {
   res.cookies.set('access_token', '', { httpOnly: true, maxAge: 0, path: '/' });
@@ -132,11 +143,7 @@ async function proxyRequest(
       return NextResponse.json({ detail: 'Backend unreachable' }, { status: 502 });
     }
 
-    const retryBody = await retryRes.arrayBuffer();
-    const res = new NextResponse(retryBody, {
-      status: retryRes.status,
-      headers: makeResponseHeaders(retryRes),
-    });
+    const res = await relayResponse(retryRes, makeResponseHeaders(retryRes));
     // Persist the new access token in the HttpOnly cookie (7-day refresh window
     // minus however long we'll use the new 24 h access token is fine to keep
     // at 24 h here — the important thing is it replaces the expired one).
@@ -161,11 +168,7 @@ async function proxyRequest(
     return clearAuthCookies(res);
   }
 
-  const responseBody = await backendRes.arrayBuffer();
-  return new NextResponse(responseBody, {
-    status: backendRes.status,
-    headers: makeResponseHeaders(backendRes),
-  });
+  return relayResponse(backendRes, makeResponseHeaders(backendRes));
 }
 
 export async function GET(
